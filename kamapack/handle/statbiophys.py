@@ -2,6 +2,7 @@ import os, sys
 import glob
 import numpy as np
 import pandas as pd
+from itertools import groupby
 
 from kamapack.utils import fileScope
 
@@ -264,4 +265,33 @@ def poisson_stderr( frequencies, N ):
     stderr = np.sqrt( ( freqs + np.power(freqs,2) ) / N )
     
     return stderr
+###
+
+
+
+################
+#  FASTA ITER  #
+################
+
+def fasta_iter(fasta_name):
+    """
+    modified from Brent Pedersen
+    given a fasta file. yield tuples of header, sequence
+    """
+
+    fh = open(fasta_name)
+
+    # ditch the boolean (x[0]) and just keep the header or sequence since
+    # we know they alternate.
+    faiter = (x[1] for x in groupby(fh, lambda line: line[0] == ">"))
+
+    for header in faiter:
+        # drop the ">"
+        headerStr = header.__next__()[1:].strip()
+
+        # join all sequence lines to one.
+        seq = "".join(s.strip() for s in faiter.__next__())
+
+        # create a generator
+        yield (headerStr, seq)
 ###
