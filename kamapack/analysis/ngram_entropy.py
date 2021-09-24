@@ -117,8 +117,8 @@ def main( ) :
     # initilialize entropy file  
     Results = []
     headers = ['K_seq', 'N_ngrams', 'K_obs', 'NSB']
-    if NSBstdDev is True : headers.append( 'NSBstdDev' )
-    if more_entr is True : headers.append( ['ML', 'MM', 'CS'] )
+    if NSBstdDev is True : headers = headers + ['NSBstdDev']
+    if more_entr is True : headers = headers + ['ML', 'MM', 'CS']
     Results.append( headers )
 
     ###################
