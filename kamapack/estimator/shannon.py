@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from kamapack.utils import dict_generator
-from kamapack.estimator.default_entropy import _entropy
+from kamapack.estimator import default_entropy
 
 ######################
 #  EXPERIMENT CLASS  #
@@ -89,22 +89,24 @@ class Experiment :
     
     def show( self ):
         '''
-        To print a short summary of the experiment.
+        To print a short summary of the Experiment.
         '''
         
         print("Total number of counts: ", self.tot_counts)
         print("Number of Categories: ", self.usr_categ, ' (a priori) | ', self.obs_categ, ' (observed)')
         print("Recurrencies: ", self.counts_hist )
+        
+    def compact( self )
+        
+        return Compact( self )
 
     def entropy( self, method, unit="ln", **kwargs ):
         '''
-        A wrapper for the Shannon entropy estimation over a given experiment class object through a chosen "method".
+        A wrapper for the Shannon entropy estimation over a given Experiment class object through a chosen "method".
         The unit of the logarithm can be specified through the parameter "unit".
             
         Parameters
         ----------
-        xperiment: Experiment object
-                an experiment class object already initialized with the observation vector.
         method: str
                 the name of the entropy estimation method:
                 - "ML": Maximum Likelihood entropy estimator;
@@ -125,15 +127,22 @@ class Experiment :
         return numpy.array
         '''
         
-        return _entropy( self, method, unit=unit, **kwargs )
+        return default_entropy.switchboard( self.compact(), method, unit=unit, **kwargs )
 
 ###################
 #  COMPACT CLASS  #
 ###################
 
-#class Compact :
-    
-#    def __init__( self, experiment ) :
+class Compact :
+    '''
+    It provides aliases useful for computations.
+    '''
+    def __init__( self, experiment ) :
+        self.N = experiment.tot_counts                                   # total number of counts
+        self.K = experiment.usr_n_categ                                  # user number of categories
+        self.Kobs = experiment.obs_n_categ                               # observed number of categories
+        self.nn = experiment.counts_dict.index.values                    # counts
+        self.ff = experiment.counts_dict.values                          # recurrency of counts
     
 ######################
 #  DIVERGENCE CLASS  #

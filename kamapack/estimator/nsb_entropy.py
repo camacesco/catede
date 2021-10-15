@@ -12,15 +12,12 @@ import scipy.optimize as opt
 import multiprocessing
 
 
-###
-def NemenmanShafeeBialek( experiment, bins= None, err = False ):
+def NemenmanShafeeBialek( compACT, bins= None, err = False ):
     '''
     NSB_entropy Function Description:
     '''
 
-    # loading parameters from experiment 
-    N = experiment.tot_counts                           # total number of counts
-    K = experiment.usr_n_categ
+    N, K = compACT.N, compACT.K
     
     # >>>>>>>>>>>>>>>>>>>>>>
     #  CHECK user OPTIONS  #
@@ -51,7 +48,7 @@ def NemenmanShafeeBialek( experiment, bins= None, err = False ):
     # >>>>>>>>>>>>>>>>>>>>>>
     
     POOL = multiprocessing.Pool( multiprocessing.cpu_count() ) 
-    args = [ ( beta , experiment, err ) for beta in beta_vec ]
+    args = [ ( beta , compACT, err ) for beta in beta_vec ]
     results = POOL.starmap( _estimator_beta, args )
     POOL.close()
     
@@ -77,7 +74,7 @@ def NemenmanShafeeBialek( experiment, bins= None, err = False ):
         shannon_estimate = np.array(S, dtype=np.float)        
 
     return shannon_estimate
-###
+
 
 ##############
 #  NOTATION  #
@@ -103,20 +100,17 @@ def LogGmm( x ):
     ''' alias '''
     return loggamma( x ).real    
 
-def measureMu( b, experiment ) :
+def measureMu( a, compACT ) :
     '''
     Measure Mu term in the posterior estimators computed as the exponent of an exponential.
     '''
         
-    # DEAFULT : loading parameters from experiment        
-    N = experiment.N                                            # total number of counts
-    K = experiment.usr_n_categ                                  # number of given categories
-    nn = np.array( list( experiment.counts_dict.keys( ) ) )     # counts
-    ff = np.array( list( experiment.counts_dict.values( ) ) )   # recurrency of counts
+    # loading parameters from compACT        
+    N, nn, ff, K = compACT.N, compACT.nn, compACT.ff, compACT.K
     
     # mu computation    
-    LogMu = LogGmm( K*b ) - K * LogGmm( b )                   # Dirichelet prior normalization contribution
-    LogMu += np.dot( ff, LogGmm(nn+b) ) - LogGmm( N + K*b )   # posterior contribution
+    LogMu = LogGmm( K*a ) - K * LogGmm( a )                   # Dirichelet prior normalization contribution
+    LogMu += np.dot( ff, LogGmm(nn+a) ) - LogGmm( N + K*a )   # posterior contribution
 
     return mp.exp( LogMu )
 
@@ -130,10 +124,12 @@ def get_from_implicit( implicit_relation, x, n_bins, K, maxiter=100 ):
     requires to solve an implicit relation to get the implicit variable  in(0, infty)
     ''' 
 
+    # generalize to use also on H
     # bounds for the implicit variable
     lower_bound = 0
     # EMPIRICAL: right edge of the interval as approx of infty (WARNING:)
     upper_bound = np.log(K) * 1.e3    
+    
     # EMPIRICAL: tolerance for brentq (WARNING:)
     xtol = 1.e-2  / ( K * n_bins )        
     # arguments of `implicit_relation` are explicit variable and categories       
@@ -145,28 +141,21 @@ def get_from_implicit( implicit_relation, x, n_bins, K, maxiter=100 ):
                         args=args, xtol=xtol, maxiter=maxiter )
     
     return output
-###
 
 
 
-####################################
-#  estimation vs Dirichelet param  #
-####################################
+######################################
+#  S estimation vs Dirichelet param  #
+######################################
 
-
-
-###
-def estimate_at_alpha( a, experiment, err ):
+def estimate_S_at_alpha( a, compACT, err ):
     '''
     '''
     
-    # loading parameters from experiment        
-    N = experiment.N                                                # total number of counts
-    K = experiment.usr_categ                                        # number of given categories
-    nn = np.array( list( experiment.counts_dict.keys( ) ) )         # counts
-    ff = np.array( list( experiment.counts_dict.values( ) ) )       # recurrency of counts
+    # loading parameters from compACT        
+    N, nn, ff, K = compACT.N, compACT.nn, compACT.ff, compACT.K
     
-    mu_a = measureMu( a, experiment )
+    mu_a = measureMu( a, compACT )
     
     # entropy computation
     temp = np.dot( ff, (nn+a) * Delta_polyGmm(0, N+K*a+1, nn+a+1) )     
@@ -191,4 +180,4 @@ def estimate_at_alpha( a, experiment, err ):
         output = np.array( [ mu_a, S1_a ] )
 
     return output
-###
+
