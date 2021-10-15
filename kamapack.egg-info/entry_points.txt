@@ -1,0 +1,4 @@
+[console_scripts]
+kamapack-folder_stat = kamapack.analysis.folder_blind_stat:main
+kamapack-ngram_entropy = kamapack.analysis.ngram_entropy:main
+
