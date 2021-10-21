@@ -10,7 +10,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from utils import dict_generator
+from kamapack.utils import dict_generator
 from kamapack import default_entropy
 
 ######################
@@ -25,12 +25,18 @@ class Experiment :
         Parameters
         ----------      
         '''
+        
         #  OPEN : data  #
         if type( data ) == dict :   
             # loading dictionary where values represent keys counts                                    
             data_hist = pd.Series( data )
+        elif type( data ) == pd.DataFrame :
+            # loading datafame where values represent keys counts 
+            data_hist = data[ data.columns[0] ]
+            if len( data ) :
+                warnings.warn("The parameter `data` contained multiple columns, only the first one is considered.")
         elif type( data ) == pd.Series :
-            # loading serie where values represent index counts
+            # loading series where values represent index counts
             data_hist = data
         elif type( data ) == list or type( data ) == np.ndarray :                              
             if iscount == True :
@@ -43,10 +49,11 @@ class Experiment :
         else :
             raise TypeError("The parameter `data` has unsopported type.")
 
-        # check int counts # WARNING! : this try/except doesn't looks nice
+        # check int counts 
         try :
             data_hist = data_hist.astype(int)
         except ValueError :
+            # WARNING! : this try/except doesn't looks nice
             raise ValueError("Unrecognized count value in `data`.")    
 
         self.data_hist = data_hist
@@ -81,6 +88,7 @@ class Experiment :
             raise TypeError("The parameter `categories` must be an integer.")
         if categories > self.obs_n_categ :
             self.counts_hist[ 0 ] = categories - self.obs_n_categ
+            self.counts_hist = self.counts_hist.sort_index()
             self.usr_n_categ = categories
         else :
             self.usr_n_categ = self.obs_n_categ  
@@ -96,7 +104,7 @@ class Experiment :
         print("Number of Categories: ", self.usr_categ, ' (a priori) | ', self.obs_categ, ' (observed)')
         print("Recurrencies: ", self.counts_hist )
         
-    def compact( self )
+    def compact( self ) :
         
         return Compact( self )
 
@@ -120,8 +128,8 @@ class Experiment :
                 - "NSB": Nemenman Shafee Bialek entropy estimator.
         unit: str, optional
                 the entropy logbase unit:
-                - "log2": base 2 logairhtm (default);
-                - "ln": natural logarithm;
+                - "ln": natural logarithm (default);
+                - "log2": base 2 logarihtm;
                 - "log10":base 10 logarithm.
 
         return numpy.array
@@ -141,15 +149,15 @@ class Compact :
         self.N = experiment.tot_counts                                   # total number of counts
         self.K = experiment.usr_n_categ                                  # user number of categories
         self.Kobs = experiment.obs_n_categ                               # observed number of categories
-        self.nn = experiment.counts_dict.index.values                    # counts
-        self.ff = experiment.counts_dict.values                          # recurrency of counts
+        self.nn = experiment.counts_hist.index.values                    # counts
+        self.ff = experiment.counts_hist.values                          # recurrency of counts
     
 ######################
 #  DIVERGENCE CLASS  #
 ######################
 
-#class Divergence :
+class Divergence :
     
-#    def __init__( self, experiment_A, experiment_B ) :
-        
+    def __init__( self, experiment_A, experiment_B ) :
+        self.
     

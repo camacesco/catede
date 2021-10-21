@@ -1,10 +1,15 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 '''
-Common system commands.
+    Handy commands.
+    Copyright (C) October 2021 Francesco Camaglia, LPENS 
 '''
 
 import os, sys
 import operator
 import functools
+from itertools import groupby
 
 
 ###############
@@ -94,12 +99,7 @@ def tryMakeDir( path_choice ):
         #print('The folder "' + path_choice + '" already exists: directory creation ignored.'  )
 ###
 
-'''
-Utils Module:
-Francesco Camaglia, LPENS February 2020
-'''
 
-from itertools import groupby
 
 ####################
 #  DICT_GENERATOR  #

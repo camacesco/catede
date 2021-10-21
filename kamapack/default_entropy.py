@@ -12,7 +12,7 @@ from scipy.special import comb
 from kamapack import nsb_entropy
 
 # loagirthm unit
-_unit_Dict_ = { "log2": 1. / np.log(2), "ln": 1., "log10": 1. / np.log(10) }
+_unit_Dict_ = { "ln": 1., "log2": 1./np.log(2), "log10": 1./np.log(10) }
 
 
 #################
@@ -47,7 +47,7 @@ def switchboard( compACT, method, unit=None, **kwargs ):
         a = np.sqrt( compACT.N ) / compACT.obs_categ
         shannon_estimate = Dirichlet( compACT, a )
     elif method == "NSB":                       # Nemenman Shafee Bialek
-        shannon_estimate = nsb.NemenmanShafeeBialek( compACT, **kwargs )
+        shannon_estimate = nsb_entropy.NemenmanShafeeBialek( compACT, **kwargs )
     else:
         raise IOError("The chosen method is unknown.")
 
@@ -63,12 +63,13 @@ def switchboard( compACT, method, unit=None, **kwargs ):
 def maxlike( compACT ):
     '''
     Maximum likelihood estimator.
+    WARNING!: TO BE CHECKED
     '''
 
     # loading parameters from compACT 
     N, nn, ff = compACT.N, compACT.nn, compACT.ff
     # delete 0 counts (if present they are at position 0)
-    if 0 in nn : del nn[ 0 ], del ff[ 0 ]                      
+    if 0 in nn : nn, ff = nn[1:], ff[1:]                      
     
     shannon_estimate = np.array( np.log(N) - np.dot( ff , np.multiply( nn, np.log(nn) ) ) / N )
     return shannon_estimate
@@ -83,6 +84,7 @@ def maxlike( compACT ):
 def MillerMadow( compACT ): 
     '''
     Miller-Madow estimator.
+    WARNING!: TO BE CHECKED
     '''
     
     # loading parameters from compACT 
@@ -124,7 +126,7 @@ def ChaoShen( compACT ):
     # loading parameters from compACT 
     N, nn, ff = compACT.N, compACT.nn, compACT.ff
     # delete 0 counts (if present they are at position 0)
-    if 0 in nn : del nn[ 0 ], del ff[ 0 ]     
+    if 0 in nn : nn, ff = nn[1:], ff[1:]        
 
     C = __coverage( nn, ff )                            
     p_vec = C * nn / N                                # coverage adjusted empirical frequencies
