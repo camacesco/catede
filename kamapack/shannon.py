@@ -156,8 +156,8 @@ class Compact :
 #  DIVERGENCE CLASS  #
 ######################
 
-class Divergence :
-    
-    def __init__( self, experiment_A, experiment_B ) :
-        self.
+#class Divergence :
+#    
+#    def __init__( self, experiment_A, experiment_B ) :
+#        self.
     

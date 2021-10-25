@@ -12,7 +12,7 @@ setuptools.setup(
     author_email="francesco.camaglia@phys.ens.fr",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version='0.0.12',
+    version='0.0.13',
     description='Python package to standard statbiophys analysis.',
     license="GNU GPLv3",
     python_requires='>=3.5',

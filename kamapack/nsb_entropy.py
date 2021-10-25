@@ -12,7 +12,7 @@ from scipy.special import loggamma, polygamma
 from scipy import optimize
 import multiprocessing
 
-def NemenmanShafeeBialek( compACT, bins=None, error=False ):
+def NemenmanShafeeBialek( compACT, bins=1e4, error=False ):
     '''
     NSB_entropy Function Description:
     '''
@@ -22,15 +22,11 @@ def NemenmanShafeeBialek( compACT, bins=None, error=False ):
     # >>>>>>>>>>>>>>>>>>>>>>
     #  CHECK user OPTIONS  #
     # >>>>>>>>>>>>>>>>>>>>>>
-    
-    if bins is None:
-        # EMPIRICAL: choice of the number of bins for numerical integration
-        n_bins = int( np.log(N) * 1e2 )       
-    else :
-        try :
-            n_bins = int(bins)
-        except :
-            raise TypeError("The parameter `bins` requires an integer value.")
+        
+    try :
+        n_bins = int(bins)
+    except :
+        raise TypeError("The parameter `bins` requires an integer value.")
 
     # >>>>>>>>>>>>>>>>>
     #  Compute Alpha  #
@@ -38,7 +34,8 @@ def NemenmanShafeeBialek( compACT, bins=None, error=False ):
 
     # multiprocessing (WARNING:)
     POOL = multiprocessing.Pool( multiprocessing.cpu_count() )   
-    args = [ ( implicit_S_vs_Alpha, x + 0.5, n_bins, K ) for x in range(n_bins) ]
+    S_vec = np.linspace(0, np.log(K), n_bins)[1:-1]
+    args = [ (implicit_S_vs_Alpha, S, 0, 1e15, K) for S in S_vec ]
     Alpha_vec = POOL.starmap( get_from_implicit, args )
     POOL.close()
     Alpha_vec = np.asarray( Alpha_vec )
@@ -51,7 +48,7 @@ def NemenmanShafeeBialek( compACT, bins=None, error=False ):
     args = [ ( alpha, compACT, error ) for alpha in Alpha_vec ]
     results = POOL.starmap( estimate_S_at_alpha, args )
     POOL.close()
-    results = np.asarray( results )
+    results = np.asarray(results)
     
     # >>>>>>>>>>>>>>>
     #   estimators  #
@@ -60,19 +57,19 @@ def NemenmanShafeeBialek( compACT, bins=None, error=False ):
     # NOTE: the normalization integral is computed on the same bins 
     #       which simplifies the bin size 
     
-    Zeta = np.sum( results[:,0] )        
+    Zeta = np.trapz(results[:,0], x=S_vec)        
 
-    integral_S1 = np.dot( results[:,0],  results[:,1] )
-    S = mp.fdiv( integral_S1, Zeta )     
+    integral_S1 = np.trapz(np.multiply(results[:,0], results[:,1]), x=S_vec)
+    S1 = mp.fdiv(integral_S1, Zeta)     
 
-    if error is True :
-        integral_S2 = np.dot( results[:,0],  results[:,2] )
-        S2 = mp.fdiv( integral_S2, Zeta )
-        S_devStd = np.sqrt( S2 - np.power(S,2) )
-        shannon_estimate = np.array([S, S_devStd], dtype=np.float)   
+    if error is False :       
+        shannon_estimate = np.array(S1, dtype=np.float) 
         
-    else :       
-        shannon_estimate = np.array(S, dtype=np.float)        
+    else :
+        integral_S2 = np.trapz(np.multiply(results[:,0], results[:,2]), x=S_vec)
+        S2 = mp.fdiv(integral_S2, Zeta)
+        S_devStd = np.sqrt(S2 - np.power(S1,2))
+        shannon_estimate = np.array([S1, S_devStd], dtype=np.float)   
 
     return shannon_estimate
 
@@ -81,7 +78,7 @@ def NemenmanShafeeBialek( compACT, bins=None, error=False ):
 #  NOTATION  #
 ##############
 
-def Delta_polyGmm(order, x, y):
+def D_polyGmm(order, x, y):
     '''
     Difference between same `order` polygamma functions, computed in `x` and `y`.
     '''
@@ -91,7 +88,7 @@ def implicit_S_vs_Alpha( alpha, S, K ):
     '''
     implicit relation to be inverted.
     '''
-    return Delta_polyGmm( 0, K * alpha + 1, alpha + 1 ) - S   
+    return D_polyGmm( 0, K * alpha + 1, alpha + 1 ) - S   
 
 #################
 #  _MEASURE MU  #
@@ -119,27 +116,17 @@ def measureMu( a, compACT ) :
 #  get_from_implicit  #
 ########################
 
-def get_from_implicit( implicit_relation, x, n_bins, K, maxiter=100 ):
+def get_from_implicit( implicit_relation, y, lower, upper, *args,
+                      maxiter=100, xtol=1.e-20 ):
     '''
-    Numerical integration in (0, log(K)), domain of the explicit variable, 
-    requires to solve an implicit relation to get the implicit variable  in(0, infty)
-    ''' 
+    Find the root of the implicit relation for x in (0, infty):  
+    >    `implicit relation` ( x, *args ) - `y` = 0
+    It uses the Brent's algorithm for the root finder in the interval (lower, upper)
+    '''   
 
-    # generalize to use also on H
-    # bounds for the implicit variable
-    lower_bound = 0
-    # EMPIRICAL: right edge of the interval as approx of infty (WARNING:)
-    upper_bound = np.log(K) * 1.e3    
-    
-    # EMPIRICAL: tolerance for brentq (WARNING:)
-    xtol = 1.e-2  / ( K * n_bins )        
-    # arguments of `implicit_relation` are explicit variable and categories       
-    args = ( np.log(K) * x / n_bins , K )
-
-    # brentq algorithm for implicit relation
     # NOTE : the implicit_realtion must have opposite signs in 0 and up_bound
-    output = optimize.brentq( implicit_relation, lower_bound, upper_bound,
-                             args=args, xtol=xtol, maxiter=maxiter )
+    output = optimize.brentq( implicit_relation, lower, upper,
+                             args=( y , *args ), xtol=xtol, maxiter=maxiter )
     
     return output
 
@@ -160,7 +147,7 @@ def estimate_S_at_alpha( a, compACT, error ):
     mu_a = measureMu( a, compACT )
     
     # entropy computation
-    temp = np.dot( ff, (nn+a) * Delta_polyGmm(0, N+K*a+1, nn+a+1) )     
+    temp = np.dot( ff, (nn+a) * D_polyGmm(0, N+K*a+1, nn+a+1) )     
     S1_a = mp.fdiv( temp, N + K*a )
     
     # compute squared entropy if error is required
@@ -168,17 +155,18 @@ def estimate_S_at_alpha( a, compACT, error ):
         output = np.array( [ mu_a, S1_a ] )
 
     else :    
-        # term i != j
+        # term j != i
         S2_temp1 = np.zeros(len(ff))  
         for i in range( len(ff) ):   
-            temp = (nn+a) * (nn[i]+a) * ( Delta_polyGmm(0, nn+a+1, N+K*a+2) * Delta_polyGmm(0, nn[i]+a+1, N+K*a+2) - polygamma(1, N+K*a+2) )
+            temp = (nn+a) * (nn[i]+a) 
+            temp *= ( D_polyGmm(0, nn+a+1, N+K*a+2) * D_polyGmm(0, nn[i]+a+1, N+K*a+2) - polygamma(1, N+K*a+2) )
             S2_temp1[i] = np.dot( ff, temp )
         # correction # WARNING!: I could avoid this eliminating i-th term from nn and ff above
-        correction = np.power(nn+a, 2) * ( np.power(Delta_polyGmm(0, nn+a+1, N+K*a+2), 2) - polygamma(1, N+K*a+2) )
+        correction = np.power(nn+a, 2) * ( np.power(D_polyGmm(0, nn+a+1, N+K*a+2), 2) - polygamma(1, N+K*a+2) )
         S2_temp1 = S2_temp1 - correction
         
-        # term i == j
-        S2_temp2 = (nn+a) * (nn+a+1) * ( np.power(Delta_polyGmm(0, nn+a+2, N+K*a+2), 2) + Delta_polyGmm(1, nn+a+2, N+K*a+2) ) 
+        # term j == i
+        S2_temp2 = (nn+a) * (nn+a+1) * ( np.power(D_polyGmm(0, nn+a+2, N+K*a+2), 2) + D_polyGmm(1, nn+a+2, N+K*a+2) ) 
         
         # total
         S2_a = mp.fdiv( np.dot( ff, S2_temp1 + S2_temp2 ), mp.fmul(N + K*a+1, N + K*a) )
