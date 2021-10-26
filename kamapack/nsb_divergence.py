@@ -119,6 +119,7 @@ def estimate_DKL_at_alpha_beta( a, S, b, H, compACT ):
     # loading parameters from compACT        
     N_A, N_B = compACT.N_A, compACT.N_B
     nn_A, nn_B, ff = compACT.nn_A, compACT.nn_B, compACT.ff
+    K = compACT.K
     
     sigma = Sigma( H, S, K )
     # DKL computation
