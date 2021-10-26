@@ -66,7 +66,7 @@ def NSBDKL( compACT, bins=1e4, cutoff_ratio=5 ):
     #  estimator vs alpha,beta  #
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>
     
-    # WARNING!: this itertool operation can slow down 
+    # WARNING!: this itertool operation is a bottleneck
     args = [ x for x in itertools.product(zip(Alpha_vec,S_vec),zip(Beta_vec,H_vec))]
     args = [ x[0] + x[1] + (compACT,) for x in args]
     
@@ -82,7 +82,7 @@ def NSBDKL( compACT, bins=1e4, cutoff_ratio=5 ):
     temp = list(map(lambda i: np.trapz(np.multiply(results[:,0][i:i+len(Beta_vec)], mu_b)), np.arange(len(Alpha_vec)) ))
     zeta = np.trapz(np.multiply(temp, mu_a))
     temp = list(map(lambda i: np.trapz(np.multiply(results[:,1][i:i+len(Beta_vec)], mu_b)), np.arange(len(Alpha_vec)) ))
-    estimate = mp.fdiv(np.trapz(np.multiply(temp, mu_a)), Zeta)  
+    estimate = mp.fdiv(np.trapz(np.multiply(temp, mu_a)), zeta)  
 
     return estimate
 
