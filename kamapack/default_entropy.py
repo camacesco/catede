@@ -29,7 +29,7 @@ def switchboard( compACT, method, unit=None, **kwargs ):
 
     # choosing entropy estimation method
     if method == "ML":                          # Maximum Likelihood
-        shannon_estimate = maxlike( compACT )
+        shannon_estimate = MaximumLikelihood( compACT )
     elif method == "MM":                        # Miller Madow
         shannon_estimate = MillerMadow( compACT )
     elif method == "CS":                        # Chao Shen       
@@ -60,7 +60,7 @@ def switchboard( compACT, method, unit=None, **kwargs ):
 #  MAXIMUM LIKELIHOOD ESTIMATOR  #
 ##################################
 
-def maxlike( compACT ):
+def MaximumLikelihood( compACT ):
     '''
     Maximum likelihood estimator.
     WARNING!: TO BE CHECKED
@@ -90,7 +90,7 @@ def MillerMadow( compACT ):
     # loading parameters from compACT 
     N, Kobs = compACT.N, compACT.Kobs
 
-    shannon_estimate = np.array( maxlike( compACT ) + 0.5 * ( Kobs - 1 ) / N )
+    shannon_estimate = np.array( MaximumLikelihood( compACT ) + 0.5 * ( Kobs - 1 ) / N )
     return shannon_estimate 
 ###
 

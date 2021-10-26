@@ -12,7 +12,7 @@ from scipy.special import loggamma, polygamma
 from scipy import optimize
 import multiprocessing
 
-def NemenmanShafeeBialek( compACT, bins=1e4, error=False ):
+def NemenmanShafeeBialek( compACT, error=False, bins=1e4 ):
     '''
     NSB_entropy Function Description:
     '''
