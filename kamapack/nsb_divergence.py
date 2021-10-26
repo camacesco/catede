@@ -126,4 +126,4 @@ def estimate_DKL_at_alpha_beta( a, S, b, H, compACT ):
     temp = np.dot( ff, (nn_A+a) * ( D_polyGmm(0, N_B+K*b, nn_B+b) - D_polyGmm(0, N_A+K*a+1, nn_A+a+1) ) )
     output = mp.fdiv( sigma * temp, N_A + K*a )  
     
-    return np.array[sigma, output]
+    return np.array([sigma, output])
