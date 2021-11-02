@@ -3,7 +3,7 @@
 
 '''
     Handy commands.
-    Copyright (C) October 2021 Francesco Camaglia, LPENS 
+    Copyright (C) November 2021 Francesco Camaglia, LPENS 
 '''
 
 import os, sys
@@ -98,42 +98,3 @@ def tryMakeDir( path_choice ):
         pass
         #print('The folder "' + path_choice + '" already exists: directory creation ignored.'  )
 ###
-
-
-
-####################
-#  DICT_GENERATOR  #
-####################
-
-def dict_generator( sequences ):
-    '''
-    It reads the received list of sequences (or it cast it to a list) and returns
-    the dictionary of recurrency per sequence. 
-    '''
-    
-    sequences = reduceList(list( sequences ))
-    sequences.sort()
-    # counting repetitions through grupby
-    seq_dict = { key : len( list( group ) ) for key, group in groupby( sequences ) }
-    
-    return seq_dict
-###
-
-
-####################
-#  HIST_GENERATOR  #
-####################
-
-def hist_generator( sequences ):
-    '''
-    It reads the received list of sequences (or it cast it to a list) and returns
-    the vector of recurrencies
-    '''
-     
-    seq_dict = dict_generator( sequences )    
-    # Note: this array's order is meaningless (sequences alphabetically ordered)
-    observations = list( seq_dict.values() )
-    
-    return observations
-###
-

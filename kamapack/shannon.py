@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) October 2021 Francesco Camaglia, LPENS 
+    Copyright (C) November 2021 Francesco Camaglia, LPENS 
 '''
 
 import warnings
@@ -10,7 +10,6 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from kamapack.utils import dict_generator
 from kamapack import default_entropy
 
 class _skeleton_ :
@@ -88,11 +87,11 @@ class Experiment( _skeleton_ ) :
         elif type( data ) == list or type( data ) == np.ndarray :                              
             if iscount == True :
                 # loading list of counts
-                obs = { k:v for k,v in enumerate(data) }
+                data_hist = pd.Series( data ).astype(int)
             else :
                 # loading raw list of sequences
-                obs = dict_generator( data )   
-            data_hist = pd.Series( obs )
+                temp = pd.Series( sequences )
+                data_hist = output.groupby( temp ).size()
         else :
             raise TypeError("The parameter `data` has unsopported type.")
 
@@ -104,10 +103,11 @@ class Experiment( _skeleton_ ) :
             raise ValueError("Unrecognized count value in `data`.")    
 
         self.data_hist = data_hist
-        self.tot_counts = np.sum( data_hist.values )
-        self.counts_hist = pd.Series( dict_generator( data_hist.values ) )        
+        self.tot_counts = np.sum( data_hist.values )  
         self.obs_n_categ = len( data_hist ) # observed categories
-
+        temp = pd.Series( data_hist.values ).astype(int)
+        self.counts_hist = temp.groupby( temp ).size()  
+        
         #  Load categories  #
         self.update_categories( categories )
         if self.usr_n_categ > self.obs_n_categ :
