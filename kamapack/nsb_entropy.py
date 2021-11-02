@@ -11,6 +11,7 @@ from mpmath import mp
 from scipy.special import loggamma, polygamma
 from scipy import optimize
 import multiprocessing
+import tqdm
 
 def NemenmanShafeeBialek( compACT, error=False, bins=1e4 ):
     '''
@@ -18,6 +19,7 @@ def NemenmanShafeeBialek( compACT, error=False, bins=1e4 ):
     '''
 
     N, K = compACT.N, compACT.K
+    CPU_Count = multiprocessing.cpu_count()
     
     # >>>>>>>>>>>>>>>>>>>>>>
     #  CHECK user OPTIONS  #
@@ -33,20 +35,20 @@ def NemenmanShafeeBialek( compACT, error=False, bins=1e4 ):
     # >>>>>>>>>>>>>>>>>
 
     # multiprocessing (WARNING:)
-    POOL = multiprocessing.Pool( multiprocessing.cpu_count() )   
+    POOL = multiprocessing.Pool( CPU_Count )   
     S_vec = np.linspace(0, np.log(K), n_bins)[1:-1]
     args = [ (implicit_S_vs_Alpha, S, 0, 1e15, K) for S in S_vec ]
-    Alpha_vec = POOL.starmap( get_from_implicit, args )
+    Alpha_vec = POOL.starmap( get_from_implicit, tqdm.tqdm(args,total=len(args)) )
     POOL.close()
     Alpha_vec = np.asarray( Alpha_vec )
     
-    # >>>>>>>>>>>>>>>>>>>>>>
-    #  estimators vs beta  #
-    # >>>>>>>>>>>>>>>>>>>>>>
+    # >>>>>>>>>>>>>>>>>>>>>>>
+    #  estimators vs alpha  #
+    # >>>>>>>>>>>>>>>>>>>>>>>
     
-    POOL = multiprocessing.Pool( multiprocessing.cpu_count() ) 
+    POOL = multiprocessing.Pool( CPU_Count ) 
     args = [ ( alpha, compACT, error ) for alpha in Alpha_vec ]
-    results = POOL.starmap( estimate_S_at_alpha, args )
+    results = POOL.starmap( estimate_S_at_alpha, tqdm.tqdm(args,total=len(args)) )
     POOL.close()
     results = np.asarray(results)
     
