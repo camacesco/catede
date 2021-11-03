@@ -38,7 +38,7 @@ def NemenmanShafeeBialek( compACT, error=False, bins=1e4 ):
     POOL = multiprocessing.Pool( CPU_Count )   
     S_vec = np.linspace(0, np.log(K), n_bins)[1:-1]
     args = [ (implicit_S_vs_Alpha, S, 0, 1e15, K) for S in S_vec ]
-    Alpha_vec = POOL.starmap( get_from_implicit, tqdm.tqdm(args,total=len(args)) )
+    Alpha_vec = POOL.starmap( get_from_implicit, tqdm.tqdm(args, total=len(args), desc="Pre-computation") )
     POOL.close()
     Alpha_vec = np.asarray( Alpha_vec )
     
@@ -48,7 +48,7 @@ def NemenmanShafeeBialek( compACT, error=False, bins=1e4 ):
     
     POOL = multiprocessing.Pool( CPU_Count ) 
     args = [ ( alpha, compACT, error ) for alpha in Alpha_vec ]
-    results = POOL.starmap( estimate_S_at_alpha, tqdm.tqdm(args,total=len(args)) )
+    results = POOL.starmap( estimate_S_at_alpha, tqdm.tqdm(args, total=len(args), desc="Evaluation") )
     POOL.close()
     results = np.asarray(results)
     
