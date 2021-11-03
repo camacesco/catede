@@ -12,9 +12,9 @@ import multiprocessing
 import itertools
 import tqdm
 
-from kamapack.nsb_entropy import *
+from kamapack.nsb_entropy import D_polyGmm, implicit_S_vs_Alpha, LogGmm, measureMu, get_from_implicit
 
-def NSBDKL( compACT, bins=1e3, cutoff_ratio=5 ):
+def NemenmanShafeeBialek( compACT, bins=1e3, cutoff_ratio=5 ):
     '''
     '''
 
@@ -42,7 +42,7 @@ def NSBDKL( compACT, bins=1e3, cutoff_ratio=5 ):
     args = args + [ (implicit_H_vs_Beta, H, 1.e-20, 1e20, K) for H in H_vec ]
     
     POOL = multiprocessing.Pool( CPU_Count )
-    results = POOL.starmap( get_from_implicit, tqdm.tqdm(args,total=len(args)) )
+    results = POOL.starmap( get_from_implicit, tqdm.tqdm(args, total=len(args), desc='Pre-computations 1/2') )
     POOL.close()
     results = np.asarray( results )
     
@@ -57,7 +57,7 @@ def NSBDKL( compACT, bins=1e3, cutoff_ratio=5 ):
     args = args + [ (b, compACT.compact_B ) for b in Beta_vec ]
     
     POOL = multiprocessing.Pool( CPU_Count )
-    results = POOL.starmap( measureMu, tqdm.tqdm(args,total=len(args)) )
+    results = POOL.starmap( measureMu, tqdm.tqdm(args, total=len(args), desc='Pre-computations 2/2') )
     POOL.close()
     results = np.asarray( results )  
     
@@ -68,11 +68,11 @@ def NSBDKL( compACT, bins=1e3, cutoff_ratio=5 ):
     #  estimator vs alpha,beta  #
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>
         
-    # WARNING!: this itertool operation is a bottleneck
+    # WARNING!: this itertools operation is a bottleneck!
     args = [ x[0] + x[1] + (compACT,) for x in itertools.product(zip(Alpha_vec,S_vec),zip(Beta_vec,H_vec))]
             
     POOL = multiprocessing.Pool( CPU_Count ) 
-    results = POOL.starmap( estimate_DKL_at_alpha_beta, tqdm.tqdm(args,total=len(args)) )
+    results = POOL.starmap( estimate_DKL_at_alpha_beta, tqdm.tqdm(args, total=len(args), desc='Grid Evaluations') )
     POOL.close()
     results = np.asarray(results)
     
@@ -84,7 +84,7 @@ def NSBDKL( compACT, bins=1e3, cutoff_ratio=5 ):
     args = args + [ (x, mu_b, H_vec) for x in results[:,1].reshape(len(Alpha_vec), len(Beta_vec)) ]
     
     POOL = multiprocessing.Pool( CPU_Count ) 
-    results = POOL.starmap( integral_with_mu, tqdm.tqdm(args,total=len(args)) )
+    results = POOL.starmap( integral_with_mu, tqdm.tqdm(args, total=len(args), desc='Final Integration') )
     POOL.close()
     results = np.asarray(results)
     

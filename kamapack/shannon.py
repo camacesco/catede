@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from kamapack import default_entropy
+from kamapack import default_divergence
 
 class _skeleton_ :
 
@@ -120,22 +121,22 @@ class Experiment( _skeleton_ ) :
 
     def entropy( self, method, unit="ln", **kwargs ):
         '''
-        A wrapper for the Shannon entropy estimation over a given Experiment class object through a chosen "method".
-        The unit of the logarithm can be specified through the parameter "unit".
+        Shannon entropy estimation over a given Experiment class object with a chosen `method`.
+        The unit of the logarithm can be specified through the parameter `unit`.
             
         Parameters
         ----------
         method: str
                 the name of the entropy estimation method:
-                - "ML": Maximum Likelihood entropy estimator;
-                - "MM": Miller Madow entropy estimator;
-                - "CS": Chao Shen entropy estimator;       
-                - "shrink": shrinkage entropy estimator;       
-                - "Jeffreys": Jeffreys entropy estimator;
-                - "Laplace": Laplace entropy estimator;
-                - "SG": Schurmann-Grassberger entropy estimator;
-                - "minimax": minimax entropy estimator;
-                - "NSB": Nemenman Shafee Bialek entropy estimator.
+                - "ML": Maximum Likelihood estimator;
+                - "MM": Miller Madow estimator;
+                - "CS": Chao Shen estimator;       
+                - "shrink": shrinkage estimator;       
+                - "Jeffreys": Jeffreys estimator;
+                - "Laplace": Laplace estimator;
+                - "SG": Schurmann-Grassberger estimator;
+                - "minimax": minimax estimator;
+                - "NSB": Nemenman Shafee Bialek estimator.
         unit: str, optional
                 the entropy logbase unit:
                 - "ln": natural logarithm (default);
@@ -194,6 +195,33 @@ class Divergence( _skeleton_ ) :
         self.exp_A.update_categories( self.usr_n_categ )
         self.exp_B = my_exp_B
         self.exp_B.update_categories( self.usr_n_categ )
+        
+    '''
+    Methods
+    -------
+    '''
+
+    def kullback_leibler( self, method, unit="ln", **kwargs ):
+        '''
+        Kullback-Leibler divergence estimation over a given Divergence class object through a chosen `method`.
+        The unit of the logarithm can be specified through the parameter `unit`.
+            
+        Parameters
+        ----------
+        method: str
+                the name of the Kullback-Leibler estimation method:
+                - "ML": Maximum Likelihood estimator;
+                - "NSB": Nemenman Shafee Bialek estimator.
+        unit: str, optional
+                the entropy logbase unit:
+                - "ln": natural logarithm (default);
+                - "log2": base 2 logarihtm;
+                - "log10":base 10 logarithm.
+
+        return numpy.array
+        '''
+        
+        return default_divergence.switchboard( self.compact(), method, unit=unit, **kwargs )
         
     def compact( self ) :
         '''
