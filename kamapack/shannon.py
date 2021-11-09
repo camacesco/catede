@@ -80,7 +80,7 @@ class Experiment( _skeleton_ ) :
         elif type( data ) == pd.DataFrame :
             # loading datafame where values represent keys counts 
             data_hist = data[ data.columns[0] ]
-            if len( data ) :
+            if len( data.columns ) > 1 :
                 warnings.warn("The parameter `data` contained multiple columns, only the first one is considered.")
         elif type( data ) == pd.Series :
             # loading series where values represent index counts
@@ -176,7 +176,7 @@ class Divergence( _skeleton_ ) :
 
         df = pd.concat( [my_exp_A.data_hist, my_exp_B.data_hist], axis=1 )
         df = df.replace(np.nan, 0).astype(int)
-        df = df.rename(columns={0:"Exp-A", 1:"Exp-B"})
+        df.columns = ["Exp-A", "Exp-B"]
       
         self.data_hist = df
         self.obs_n_categ = len( df )

@@ -30,24 +30,32 @@ def switchboard( compACT, method, unit=None, **kwargs ):
     # choosing entropy estimation method
     if method == "ML":                          # Maximum Likelihood
         shannon_estimate = MaximumLikelihood( compACT )
+        
+    elif method == "NSB":                       # Nemenman Shafee Bialek
+        shannon_estimate = nsb_entropy.NemenmanShafeeBialek( compACT, **kwargs )
+        
     elif method == "MM":                        # Miller Madow
         shannon_estimate = MillerMadow( compACT )
+        
     elif method == "CS":                        # Chao Shen       
         shannon_estimate = ChaoShen( compACT )
+        
     elif method == "Jeffreys":                  # Jeffreys
         a = 0.5
         shannon_estimate = Dirichlet( compACT, a )
+        
     elif method == "Laplace":                   # Laplace
         a = 1.
         shannon_estimate = Dirichlet( compACT, a )
+        
     elif method == "SG":                        # Schurmann-Grassberger
-        a = 1. / compACT.obs_categ
+        a = 1. / compACT.Kobs
         shannon_estimate = Dirichlet( compACT, a )
+        
     elif method == "minimax":                   # minimax
-        a = np.sqrt( compACT.N ) / compACT.obs_categ
+        a = np.sqrt( compACT.N ) / compACT.Kobs
         shannon_estimate = Dirichlet( compACT, a )
-    elif method == "NSB":                       # Nemenman Shafee Bialek
-        shannon_estimate = nsb_entropy.NemenmanShafeeBialek( compACT, **kwargs )
+
     else:
         raise IOError("The chosen method is unknown.")
 
@@ -71,8 +79,8 @@ def MaximumLikelihood( compACT ):
     # delete 0 counts (if present they are at position 0)
     if 0 in nn : nn, ff = nn[1:], ff[1:]                      
     
-    shannon_estimate = np.array( np.log(N) - np.dot( ff , np.multiply( nn, np.log(nn) ) ) / N )
-    return shannon_estimate
+    output = np.log(N) - np.dot( ff , np.multiply( nn, np.log(nn) ) ) / N
+    return np.array( output )
 ###
 
 
@@ -90,8 +98,8 @@ def MillerMadow( compACT ):
     # loading parameters from compACT 
     N, Kobs = compACT.N, compACT.Kobs
 
-    shannon_estimate = np.array( MaximumLikelihood( compACT ) + 0.5 * ( Kobs - 1 ) / N )
-    return shannon_estimate 
+    output = MaximumLikelihood( compACT ) + 0.5 * ( Kobs - 1 ) / N
+    return np.array( output )
 ###
 
 
@@ -132,8 +140,8 @@ def ChaoShen( compACT ):
     p_vec = C * nn / N                                # coverage adjusted empirical frequencies
     lambda_vec = 1. - np.power( 1. - p_vec, N )         # probability to see a bin (specie) in the sample
 
-    shannon_estimate = np.array( - np.dot( ff , p_vec * np.log( p_vec ) / lambda_vec ) )
-    return shannon_estimate 
+    output = - np.dot( ff , p_vec * np.log( p_vec ) / lambda_vec )
+    return np.array( output )
 ###
 
 
@@ -145,13 +153,16 @@ def ChaoShen( compACT ):
 def Dirichlet( compACT, a ):
     '''
     Estimate entropy based on Dirichlet-multinomial pseudocount model.
-    a:  pseudocount per bin
-    a=0          :   empirical estimate
-    a=1          :   Laplace
-    a=1/2        :   Jeffreys
-    a=1/M        :   Schurmann-Grassberger  (M: number of bins)
-    a=sqrt(N)/M  :   minimax
-    WARNING!: TO BE CHECKED
+
+    Parameters
+    ----------  
+    a: float
+        Pseudocount per bin  (Dirichlet parameter)
+        (e.g.)
+        a=1          :   Laplace
+        a=1/2        :   Jeffreys
+        a=1/M        :   Schurmann-Grassberger  (M: number of bins)
+        a=sqrt(N)/M  :   minimax
     '''
 
     # loading parameters from compACT 
@@ -159,8 +170,9 @@ def Dirichlet( compACT, a ):
 
     nn_a = nn + a                                       # counts plus pseudocounts
     N_a = N + a * np.sum( ff )                          # total number of counts plus pseudocounts
-
-    shannon_estimate  = np.array(  np.log( N_a ) - np.dot( ff , nn_a * np.log( nn_a ) ) / N_a )
-    return shannon_estimate  
+    hh_a = nn_A / N_a                                   # frequencies
+    
+    output = - np.dot( ff , hh_a * np.log( hh_a ) )
+    return np.array( output )
 ###
 
