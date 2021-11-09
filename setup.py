@@ -7,13 +7,13 @@ data_files_to_include = [('', ['README.md', 'LICENSE'])]
 
 setuptools.setup(
     name='kamapack',
-    #url="https://github.com/alfaceor/pygor3",
+    url="https://github.com/camacesco/kamapack",
     author="Francesco Camaglia",
     author_email="francesco.camaglia@phys.ens.fr",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version='0.0.14',
-    description='Python package to standard statbiophys analysis.',
+    version='0.0.16',
+    description='Python package for entropy and KL divergence estimation.',
     license="GNU GPLv3",
     python_requires='>=3.5',
     install_requires = [
@@ -26,10 +26,4 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     data_files = data_files_to_include,
     include_package_data=True,
-    entry_points= {
-        'console_scripts' : [
-            'kamapack-ngram_entropy=kamapack.analysis.ngram_entropy:main',
-            'kamapack-folder_stat=kamapack.analysis.folder_blind_stat:main'
-        ],
-    }
 )
