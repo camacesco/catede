@@ -12,13 +12,14 @@ import multiprocessing
 import itertools
 import tqdm
 
-from kamapack.nsb_entropy import D_polyGmm, implicit_S_vs_Alpha, LogGmm, measureMu, get_from_implicit
+from ._nsb_aux_definitions import *
 
-def NemenmanShafeeBialek( compACT, bins=1e3, cutoff_ratio=5 ):
+def NemenmanShafeeBialek( compACTdiv, bins=1e3, cutoff_ratio=5, error=False ):
     '''
+    NSB Kullback-Leibler divergence estimator description:
     '''
 
-    K = compACT.K
+    K = compACTdiv.K
     CPU_Count = multiprocessing.cpu_count()
     
     # >>>>>>>>>>>>>>>>>>>>>>
@@ -53,8 +54,8 @@ def NemenmanShafeeBialek( compACT, bins=1e3, cutoff_ratio=5 ):
     #  Compute MeasureMu Alpha and Beta #
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     
-    args = [ (a, compACT.compact_A ) for a in Alpha_vec ]
-    args = args + [ (b, compACT.compact_B ) for b in Beta_vec ]
+    args = [ (a, compACTdiv.compact_A ) for a in Alpha_vec ]
+    args = args + [ (b, compACTdiv.compact_B ) for b in Beta_vec ]
     
     POOL = multiprocessing.Pool( CPU_Count )
     results = POOL.starmap( measureMu, tqdm.tqdm(args, total=len(args), desc='Pre-computations 2/2') )
@@ -69,10 +70,10 @@ def NemenmanShafeeBialek( compACT, bins=1e3, cutoff_ratio=5 ):
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>
         
     # WARNING!: this itertools operation is a bottleneck!
-    args = [ x[0] + x[1] + (compACT,) for x in itertools.product(zip(Alpha_vec,S_vec),zip(Beta_vec,H_vec))]
+    args = [ x[0] + x[1] + (compACTdiv, error,) for x in itertools.product(zip(Alpha_vec,S_vec),zip(Beta_vec,H_vec))]
             
     POOL = multiprocessing.Pool( CPU_Count ) 
-    results = POOL.starmap( estimate_DKL_at_alpha_beta, tqdm.tqdm(args, total=len(args), desc='Grid Evaluations') )
+    results = POOL.starmap( estimates_at_alpha_beta, tqdm.tqdm(args, total=len(args), desc='Grid Evaluations') )
     POOL.close()
     results = np.asarray(results)
     
@@ -80,28 +81,35 @@ def NemenmanShafeeBialek( compACT, bins=1e3, cutoff_ratio=5 ):
     #   integrations  #
     # >>>>>>>>>>>>>>>>>
     
-    args = [ (x, mu_b, H_vec) for x in results[:,0].reshape(len(Alpha_vec), len(Beta_vec)) ]
-    args = args + [ (x, mu_b, H_vec) for x in results[:,1].reshape(len(Alpha_vec), len(Beta_vec)) ]
+    # WARNING!: these operations are a bottleneck!
+    all_sigma = results[:,0].reshape(len(Alpha_vec), len(Beta_vec))
+    all_DKL_ab_times_sigma = results[:,1].reshape(len(Alpha_vec), len(Beta_vec))
+            
+    args = [ (mu_b, x, H_vec) for x in all_sigma ]
+    args = args + [ (mu_b, x, H_vec) for x in all_DKL_ab_times_sigma ]
     
+    if error is True :    
+        all_DKL2_ab_times_sigma = results[:,2].reshape(len(Alpha_vec), len(Beta_vec))
+        args = args + [ (mu_b, x, H_vec) for x in all_DKL2_ab_times_sigma ]
+        
     POOL = multiprocessing.Pool( CPU_Count ) 
-    results = POOL.starmap( integral_with_mu, tqdm.tqdm(args, total=len(args), desc='Final Integration') )
+    results = POOL.starmap( integral_with_mu, tqdm.tqdm(args, total=len(args), desc='Final Integrations') )
     POOL.close()
     results = np.asarray(results)
     
-    zeta = integral_with_mu(results[:len(Alpha_vec)], mu_a, S_vec)
-    estimate = mp.fdiv(integral_with_mu(results[len(Alpha_vec):], mu_a, S_vec), zeta)  
+    Zeta = integral_with_mu(mu_a, results[:len(Alpha_vec)], S_vec)
+    DKL1 = mp.fdiv(integral_with_mu(mu_a, results[len(Alpha_vec):2*len(Alpha_vec)], S_vec), Zeta)  
     
-    return estimate
+    if error is False :       
+        kullback_leibler_estimate = np.array(DKL1, dtype=np.float) 
+        
+    else :
+        DKL2 = mp.fdiv(integral_with_mu(mu_a, results[2*len(Alpha_vec):], S_vec), Zeta)  
+        DKL_devStd = np.sqrt(DKL2 - np.power(DKL1, 2))
+        kullback_leibler_estimate = np.array([DKL1, DKL_devStd], dtype=np.float)   
+    
+    return kullback_leibler_estimate
 
-##############
-#  NOTATION  #
-##############
-
-def implicit_H_vs_Beta( beta, x, K ):
-    '''
-    implicit relation to be inverted.
-    '''
-    return D_polyGmm( 0, K * beta , beta ) - x
 
 ###########
 #  SIGMA  #
@@ -114,31 +122,33 @@ def Sigma( H, S, K ) :
     else :
         return 1. / z 
     
-######################################
-#     #
-######################################
+#########################################
+#  DKL estimation vs Dirichelet params  #
+#########################################
 
-def estimate_DKL_at_alpha_beta( a, S, b, H, compACT ):
+def estimates_at_alpha_beta( a, S, b, H, compACTdiv, error ):
     '''
+    It returns an array [ measureMu, D_KL and D_KL^2 (if `error` is True) ] at the given `a` for `compACTdiv`.
     '''
     
-    # loading parameters from compACT        
-    N_A, N_B = compACT.N_A, compACT.N_B
-    nn_A, nn_B, ff = compACT.nn_A, compACT.nn_B, compACT.ff
-    K = compACT.K
+    # loading parameters from Divergence Compact        
+    N_A, N_B = compACTdiv.N_A, compACTdiv.N_B
+    nn_A, nn_B, ff = compACTdiv.nn_A, compACTdiv.nn_B, compACTdiv.ff
+    K = compACTdiv.K
     
     sigma = Sigma( H, S, K )
     # DKL computation
-    temp = np.dot( ff, (nn_A+a) * ( D_polyGmm(0, N_B+K*b, nn_B+b) - D_polyGmm(0, N_A+K*a+1, nn_A+a+1) ) )
+    temp = ff.dot( (nn_A+a) * ( D_polyGmm(0, N_B+K*b, nn_B+b) - D_polyGmm(0, N_A+K*a+1, nn_A+a+1) ) ) 
+    DKL_ab_times_sigma = sigma * mp.fdiv( temp, N_A+K*a )    
         
-    output = mp.fdiv( sigma * temp, N_A + K*a )  
-    return np.array([sigma, output])
-
-#########################
-#   integral with mu  #
-############################
-
-def integral_with_mu( func_ab, mu, x ) :
+        
+    # compute squared entropy if error is required
+    if error is False :
+        output = np.array( [ sigma, DKL_ab_times_sigma ] )
+    else :    
+        DKL2_ab_times_sigma = sigma * estimate_DKL2_at_alpha_beta(a, b, compACTdiv)
+        output = np.array( [ sigma, DKL_ab,  ] )
     
-    return np.trapz(np.multiply(func_ab, mu), x=x)
+    return output
+
     

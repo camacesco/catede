@@ -11,7 +11,6 @@ import operator
 import functools
 from itertools import groupby
 
-
 ###############
 #  FILESCOPE  #
 ###############

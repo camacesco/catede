@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) October 2021 Francesco Camaglia, LPENS 
+    Copyright (C) October 2020 Francesco Camaglia, LPENS 
     WARNING!: to be checked 
 '''
 
 import numpy as np
 from scipy.special import polygamma
-from kamapack.nsb_entropy import Delta_polyGmm
+from .nsb_entropy import Delta_polyGmm
 
 ###
 def NSB_low_coinc_est(experiment):

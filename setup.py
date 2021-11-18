@@ -12,7 +12,7 @@ setuptools.setup(
     author_email="francesco.camaglia@phys.ens.fr",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version='0.0.16',
+    version='0.0.17',
     description='Python package for entropy and KL divergence estimation.',
     license="GNU GPLv3",
     python_requires='>=3.5',
