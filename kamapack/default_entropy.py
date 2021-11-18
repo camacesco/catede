@@ -9,7 +9,7 @@
 import numpy as np
 from scipy.special import comb
 
-from kamapack import nsb_entropy
+from . import nsb_entropy
 
 # loagirthm unit
 _unit_Dict_ = { "ln": 1., "log2": 1./np.log(2), "log10": 1./np.log(10) }

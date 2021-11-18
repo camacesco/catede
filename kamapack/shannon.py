@@ -10,8 +10,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from kamapack import default_entropy
-from kamapack import default_divergence
+from . import default_entropy, default_divergence
 
 class _skeleton_ :
 
@@ -212,6 +211,10 @@ class Divergence( _skeleton_ ) :
                 the name of the Kullback-Leibler estimation method:
                 - "ML": Maximum Likelihood estimator;
                 - "NSB": Nemenman Shafee Bialek estimator.
+                - "Jeffreys": Jeffreys estimator;
+                - "Laplace": Laplace estimator;
+                - "SG": Schurmann-Grassberger estimator;
+                - "minimax": minimax estimator;                          
         unit: str, optional
                 the entropy logbase unit:
                 - "ln": natural logarithm (default);

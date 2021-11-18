@@ -9,7 +9,7 @@
 
 import numpy as np 
 
-from kamapack import nsb_divergence
+from . import nsb_divergence
 
 # loagirthm unit
 _unit_Dict_ = { "ln": 1., "log2": 1./np.log(2), "log10": 1./np.log(10) }
@@ -42,7 +42,7 @@ def switchboard( compACT, method, unit=None, **kwargs ):
     elif method == "Laplace":                   # Laplace
         a = 1.
         b = 1.
-        dkl_estimate = Dirichlet( compACT, a, **kwargs )
+        dkl_estimate = Dirichlet( compACT, a, b, **kwargs )
     
     elif method == "SG":                        # Schurmann-Grassberger
         a = 1. / compACT.compact_A.Kobs
