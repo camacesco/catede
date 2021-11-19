@@ -9,7 +9,7 @@
 
 import numpy as np 
 
-from . import nsb_divergence
+from . import cmw_divergence
 
 # loagirthm unit
 _unit_Dict_ = { "ln": 1., "log2": 1./np.log(2), "log10": 1./np.log(10) }
@@ -19,7 +19,7 @@ _unit_Dict_ = { "ln": 1., "log2": 1./np.log(2), "log10": 1./np.log(10) }
 #  SWITCHBOARD  #
 #################
 
-def switchboard( compACT, method, unit=None, **kwargs ):
+def switchboard( compACT, method="naive", unit=None, **kwargs ):
 
     # loading units
     if unit in _unit_Dict_.keys( ) :
@@ -28,11 +28,11 @@ def switchboard( compACT, method, unit=None, **kwargs ):
         raise IOError("Unknown unit, please choose amongst ", _unit_Dict_.keys( ) )
 
     # choosing entropy estimation method
-    if method == "ML":                          # Maximum Likelihood
-        dkl_estimate = MaximumLikelihood( compACT, **kwargs )
+    if method == "naive":                       # Naive
+        dkl_estimate = Naive( compACT, **kwargs )
     
-    elif method == "NSB":                       # Nemenman Shafee Bialek (?)
-        dkl_estimate = nsb_divergence.NemenmanShafeeBialek( compACT, **kwargs )
+    elif method == "CMW":                       # Camaglia Mora Walczak
+        dkl_estimate = cmw_divergence.CamagliaMoraWalczak( compACT, **kwargs )
     
     elif method == "Jeffreys":                  # Jeffreys
         a = 0.5
@@ -62,11 +62,11 @@ def switchboard( compACT, method, unit=None, **kwargs ):
 
 
 
-##################################
-#  MAXIMUM LIKELIHOOD ESTIMATOR  #
-##################################
+###########
+#  NAIVE  #
+###########
 
-def MaximumLikelihood( compACT, only_cross=False ) :
+def Naive( compACT, only_cross=False ) :
     '''
     Replacing probabilities with frequencies without considering categories not seen in one of the two.
     '''

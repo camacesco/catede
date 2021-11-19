@@ -118,7 +118,7 @@ class Experiment( _skeleton_ ) :
     -------
     '''
 
-    def entropy( self, method, unit="ln", **kwargs ):
+    def entropy( self, method="naive", unit="ln", **kwargs ):
         '''
         Shannon entropy estimation over a given Experiment class object with a chosen `method`.
         The unit of the logarithm can be specified through the parameter `unit`.
@@ -127,7 +127,7 @@ class Experiment( _skeleton_ ) :
         ----------
         method: str
                 the name of the entropy estimation method:
-                - "ML": Maximum Likelihood estimator;
+                - "naive": naive estimator (default);
                 - "MM": Miller Madow estimator;
                 - "CS": Chao Shen estimator;       
                 - "shrink": shrinkage estimator;       
@@ -145,7 +145,7 @@ class Experiment( _skeleton_ ) :
         return numpy.array
         '''
         
-        return default_entropy.switchboard( self.compact(), method, unit=unit, **kwargs )
+        return default_entropy.switchboard( self.compact(), method=method, unit=unit, **kwargs )
     
     def compact( self ) :
         '''
@@ -200,7 +200,7 @@ class Divergence( _skeleton_ ) :
     -------
     '''
 
-    def kullback_leibler( self, method, unit="ln", **kwargs ):
+    def kullback_leibler( self, method="naive", unit="ln", **kwargs ):
         '''
         Kullback-Leibler divergence estimation over a given Divergence class object through a chosen `method`.
         The unit of the logarithm can be specified through the parameter `unit`.
@@ -209,7 +209,7 @@ class Divergence( _skeleton_ ) :
         ----------
         method: str
                 the name of the Kullback-Leibler estimation method:
-                - "ML": Maximum Likelihood estimator;
+                - "naive": naive estimator (default);
                 - "NSB": Nemenman Shafee Bialek estimator.
                 - "Jeffreys": Jeffreys estimator;
                 - "Laplace": Laplace estimator;
@@ -224,7 +224,7 @@ class Divergence( _skeleton_ ) :
         return numpy.array
         '''
         
-        return default_divergence.switchboard( self.compact(), method, unit=unit, **kwargs )
+        return default_divergence.switchboard( self.compact(), method=method, unit=unit, **kwargs )
         
     def compact( self ) :
         '''

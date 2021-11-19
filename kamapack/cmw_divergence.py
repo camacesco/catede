@@ -14,9 +14,9 @@ import tqdm
 
 from ._nsb_aux_definitions import *
 
-def NemenmanShafeeBialek( compACTdiv, bins=1e3, cutoff_ratio=5, error=False ):
+def CamagliaMoraWalczak( compACTdiv, bins=1e3, cutoff_ratio=5, error=False ):
     '''
-    NSB Kullback-Leibler divergence estimator description:
+    CMW Kullback-Leibler divergence estimator description:
     '''
 
     K = compACTdiv.K
@@ -105,7 +105,7 @@ def NemenmanShafeeBialek( compACTdiv, bins=1e3, cutoff_ratio=5, error=False ):
         
     else :
         DKL2 = mp.fdiv(integral_with_mu(mu_a, results[2*len(Alpha_vec):], S_vec), Zeta)  
-        DKL_devStd = np.sqrt(DKL2 - np.power(DKL1, 2))
+        DKL_devStd = np.sqrt(DKL2 - np.power(DKL1, 2))  
         kullback_leibler_estimate = np.array([DKL1, DKL_devStd], dtype=np.float)   
     
     return kullback_leibler_estimate
@@ -147,7 +147,7 @@ def estimates_at_alpha_beta( a, S, b, H, compACTdiv, error ):
         output = np.array( [ sigma, DKL_ab_times_sigma ] )
     else :    
         DKL2_ab_times_sigma = sigma * estimate_DKL2_at_alpha_beta(a, b, compACTdiv)
-        output = np.array( [ sigma, DKL_ab,  ] )
+        output = np.array( [ sigma, DKL_ab_times_sigma, DKL2_ab_times_sigma ] )
     
     return output
 
