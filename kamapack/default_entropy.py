@@ -19,7 +19,7 @@ _unit_Dict_ = { "ln": 1., "log2": 1./np.log(2), "log10": 1./np.log(10) }
 #  SWITCHBOARD  #
 #################
 
-def switchboard( compACT, method, unit=None, **kwargs ):
+def switchboard( compACT, method="naive", unit=None, **kwargs ):
 
     # loading units
     if unit in _unit_Dict_.keys( ) :
@@ -28,8 +28,8 @@ def switchboard( compACT, method, unit=None, **kwargs ):
         raise IOError("Unknown unit, please choose amongst ", _unit_Dict_.keys( ) )
 
     # choosing entropy estimation method
-    if method == "ML":                          # Maximum Likelihood
-        shannon_estimate = MaximumLikelihood( compACT )
+    if method == "naive":                       # Naive
+        shannon_estimate = Naive( compACT )
         
     elif method == "NSB":                       # Nemenman Shafee Bialek
         shannon_estimate = nsb_entropy.NemenmanShafeeBialek( compACT, **kwargs )
@@ -68,7 +68,7 @@ def switchboard( compACT, method, unit=None, **kwargs ):
 #  MAXIMUM LIKELIHOOD ESTIMATOR  #
 ##################################
 
-def MaximumLikelihood( compACT ):
+def Naive( compACT ):
     '''
     Maximum likelihood estimator.
     WARNING!: TO BE CHECKED
@@ -98,7 +98,7 @@ def MillerMadow( compACT ):
     # loading parameters from compACT 
     N, Kobs = compACT.N, compACT.Kobs
 
-    output = MaximumLikelihood( compACT ) + 0.5 * ( Kobs - 1 ) / N
+    output = Naive( compACT ) + 0.5 * ( Kobs - 1 ) / N
     return np.array( output )
 ###
 

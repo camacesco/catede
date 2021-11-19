@@ -78,38 +78,15 @@ def implicit_H_vs_Beta( beta, x, K ):
 ###################
 
 def estimate_S2_at_alpha( a, compACTexp ) :
+    ''' alias '''
     
-    # loading parameters from Experiment.compACT exp       
-    N, nn, ff, K = compACTexp.N, compACTexp.nn, compACTexp.ff, compACTexp.K
-    
-    single_sum, double_sum = Power2_Term1( a, compACTexp )
-    
-    # single sum term
-    Ss = (nn+a+1) * (nn+a) * single_sum
-    
-    # double sum term 
-    Ds = ( (nn+a)[:,None] * (nn+a) ) * double_sum
-        
-    output = ff.dot( Ss - Ds.diagonal() + Ds.dot(ff) )
-    output = mp.fdiv( output, mp.fmul(N+K*a+1, N+K*a) ) 
-    
+    output = Power2_Term1( a, compACTexp )
     return output
     
 def estimate_DKL2_at_alpha_beta( a, b, compACTdiv ) :
-    
-    # loading parameters from Divergence Compact        
-    N_A, N_B, K = compACTdiv.N_A, compACTdiv.N_B, compACTdiv.K
-    nn_A, nn_B, ff = compACTdiv.nn_A, compACTdiv.nn_B, compACTdiv.ff
+    ''' alias '''
         
-    single_sum1, double_sum1 = Power2_Term1( a, compACTdiv.compact_A )
-    single_sum2, double_sum2 = Power2_Term2( a, b, compACTdiv )
-    single_sum3, double_sum3 = Power2_Term3( b, compACTdiv.compact_B )
-    
-    Ss = (nn_A+a+1) * (nn_A+a) * ( single_sum1 - 2 * single_sum2 + single_sum3 )
-    Ds = ( (nn_A+a)[:,None] * (nn_A+a) ) * ( double_sum1 - 2 * double_sum2 + double_sum3 )
-
-    output = ff.dot( Ss - Ds.diagonal() + Ds.dot(ff) )
-    output = mp.fdiv( output, mp.fmul(N_A+K*a+1, N_A+K*a) ) 
+    output = Power2_Term1(a, compACTdiv.compact_A) - 2*Power2_Term2(a, b, compACTdiv) + Power2_Term3(a, b, compACTdiv)
     
     return output    
     
@@ -122,12 +99,18 @@ def Power2_Term1( a, compACTexp ) :
     # loading parameters from Experiment.compACT exp       
     N, nn, ff, K = compACTexp.N, compACTexp.nn, compACTexp.ff, compACTexp.K
     
-    # double sum term 
-    double_sum = D_polyGmm(0, nn+a+1, N+K*a+2)[:,None] * D_polyGmm(0, nn+a+1, N+K*a+2) - polygamma(1, N+K*a+2)
     # single sum term
     single_sum = np.power(D_polyGmm(0, nn+a+2, N+K*a+2), 2) + D_polyGmm(1, nn+a+2, N+K*a+2)
+    Ss = (nn+a+1) * (nn+a) * single_sum
     
-    return single_sum, double_sum
+    # double sum term 
+    double_sum = D_polyGmm(0, nn+a+1, N+K*a+2)[:,None] * D_polyGmm(0, nn+a+1, N+K*a+2) - polygamma(1, N+K*a+2)
+    Ds = ( (nn+a)[:,None] * (nn+a) ) * double_sum
+            
+    output = ff.dot( Ss - Ds.diagonal() + Ds.dot(ff) )
+    output = mp.fdiv( output, mp.fmul(N+K*a+1, N+K*a) ) 
+    
+    return output
 
 
 def Power2_Term2( a, b, compACTdiv ) :
@@ -138,24 +121,37 @@ def Power2_Term2( a, b, compACTdiv ) :
     N_A, N_B, K = compACTdiv.N_A, compACTdiv.N_B, compACTdiv.K
     nn_A, nn_B, ff = compACTdiv.nn_A, compACTdiv.nn_B, compACTdiv.ff
     
-    # double sum term 
-    double_sum = D_polyGmm(0, nn_A+a+1, N_A+K*a+2)[:,None] * D_polyGmm(0, nn_B+b, N_B+K*b)
     # single sum term
     single_sum = D_polyGmm(0, nn_A+a+2, N_A+K*a+2) * D_polyGmm(0, nn_B+b, N_B+K*b)
+    Ss = (nn_A+a+1) * (nn_A+a) * single_sum
+    
+    # double sum term 
+    double_sum = D_polyGmm(0, nn_A+a+1, N_A+K*a+2)[:,None] * D_polyGmm(0, nn_B+b, N_B+K*b)
+    Ds = ( (nn_A+a)[:,None] * (nn_A+a) ) * double_sum
+    
+    output = ff.dot( Ss - Ds.diagonal() + Ds.dot(ff) )
+    output = mp.fdiv( output, mp.fmul(N_A+K*a+1, N_A+K*a) ) 
+    
+    return output
 
-    return single_sum, double_sum
 
-
-def Power2_Term3( b, compACTexp ) :
+def Power2_Term3( a, b, compACTdiv ) :
     '''
     squared term : q_i q_j ln(t_i) ln(t_j)
     '''
-    # loading parameters from Experiment.compACT exp       
-    N, nn, ff, K = compACTexp.N, compACTexp.nn, compACTexp.ff, compACTexp.K
+    # loading parameters from Divergence Compact        
+    N_A, N_B, K = compACTdiv.N_A, compACTdiv.N_B, compACTdiv.K
+    nn_A, nn_B, ff = compACTdiv.nn_A, compACTdiv.nn_B, compACTdiv.ff
+    
+    # single sum term
+    single_sum = np.power(D_polyGmm(0, nn_B+b, N_B+K*b), 2) + D_polyGmm(1, nn_B+b, N_B+K*b)
+    Ss = (nn_A+a+1) * (nn_A+a) * single_sum
     
     # double sum term 
-    double_sum = D_polyGmm(0, nn+b, N+K*b)[:,None] * D_polyGmm(0, nn+b, N+K*b) - polygamma(1, N+K*b)
-    # single sum term
-    single_sum = D_polyGmm(1, nn+b, N+K*b)
-
-    return single_sum, double_sum
+    double_sum = D_polyGmm(0, nn_B+b, N_B+K*b)[:,None] * D_polyGmm(0, nn_B+b, N_B+K*b) - polygamma(1, N_B+K*b)
+    Ds = ( (nn_A+a)[:,None] * (nn_A+a) ) * double_sum
+    
+    output = ff.dot( Ss - Ds.diagonal() + Ds.dot(ff) )
+    output = mp.fdiv( output, mp.fmul(N_A+K*a+1, N_A+K*a) ) 
+    
+    return output
