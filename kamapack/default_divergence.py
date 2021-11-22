@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Default Divergence (in development)
+    *** Default Divergence ***
     Copyright (C) November 2021 Francesco Camaglia, LPENS 
     Following the architecture of J. Hausser and K. Strimmer : https://strimmerlab.github.io/software/entropy/
 '''
