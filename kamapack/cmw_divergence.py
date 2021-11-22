@@ -14,7 +14,7 @@ import tqdm
 
 from ._nsb_aux_definitions import *
 
-def CamagliaMoraWalczak( compACTdiv, bins=1e3, cutoff_ratio=5, error=False ):
+def CamagliaMoraWalczak( compACTdiv, bins=1e3, cutoff_ratio=5, error=False, progressbar=False ):
     '''
     CMW Kullback-Leibler divergence estimator description:
     '''
@@ -31,6 +31,8 @@ def CamagliaMoraWalczak( compACTdiv, bins=1e3, cutoff_ratio=5, error=False ):
     except :
         raise TypeError("The parameter `bins` requires an integer value.")
         
+    disable = not progressbar 
+        
     # >>>>>>>>>>>>>>>>>>>>>>>>>
     #  Compute Alpha and Beta #
     # >>>>>>>>>>>>>>>>>>>>>>>>>
@@ -43,7 +45,7 @@ def CamagliaMoraWalczak( compACTdiv, bins=1e3, cutoff_ratio=5, error=False ):
     args = args + [ (implicit_H_vs_Beta, H, 1.e-20, 1e20, K) for H in H_vec ]
     
     POOL = multiprocessing.Pool( CPU_Count )
-    results = POOL.starmap( get_from_implicit, tqdm.tqdm(args, total=len(args), desc='Pre-computations 1/2') )
+    results = POOL.starmap( get_from_implicit, tqdm.tqdm(args, total=len(args), desc='Pre-computations 1/2', disable=disable) )
     POOL.close()
     results = np.asarray( results )
     
@@ -58,7 +60,7 @@ def CamagliaMoraWalczak( compACTdiv, bins=1e3, cutoff_ratio=5, error=False ):
     args = args + [ (b, compACTdiv.compact_B ) for b in Beta_vec ]
     
     POOL = multiprocessing.Pool( CPU_Count )
-    results = POOL.starmap( measureMu, tqdm.tqdm(args, total=len(args), desc='Pre-computations 2/2') )
+    results = POOL.starmap( measureMu, tqdm.tqdm(args, total=len(args), desc='Pre-computations 2/2', disable=disable) )
     POOL.close()
     results = np.asarray( results )  
     
@@ -73,7 +75,7 @@ def CamagliaMoraWalczak( compACTdiv, bins=1e3, cutoff_ratio=5, error=False ):
     args = [ x[0] + x[1] + (compACTdiv, error,) for x in itertools.product(zip(Alpha_vec,S_vec),zip(Beta_vec,H_vec))]
             
     POOL = multiprocessing.Pool( CPU_Count ) 
-    results = POOL.starmap( estimates_at_alpha_beta, tqdm.tqdm(args, total=len(args), desc='Grid Evaluations') )
+    results = POOL.starmap( estimates_at_alpha_beta, tqdm.tqdm(args, total=len(args), desc='Grid Evaluations', disable=disable) )
     POOL.close()
     results = np.asarray(results)
     
@@ -93,7 +95,7 @@ def CamagliaMoraWalczak( compACTdiv, bins=1e3, cutoff_ratio=5, error=False ):
         args = args + [ (mu_b, x, H_vec) for x in all_DKL2_ab_times_sigma ]
         
     POOL = multiprocessing.Pool( CPU_Count ) 
-    results = POOL.starmap( integral_with_mu, tqdm.tqdm(args, total=len(args), desc='Final Integrations') )
+    results = POOL.starmap( integral_with_mu, tqdm.tqdm(args, total=len(args), desc='Final Integrations', disable=disable) )
     POOL.close()
     results = np.asarray(results)
     
