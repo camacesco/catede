@@ -43,20 +43,22 @@ def CamagliaMoraWalczak( compACTdiv, bins=5e2, cutoff_ratio=5, error=False, CPU_
     #  Compute Alpha and Beta #
     # >>>>>>>>>>>>>>>>>>>>>>>>>
     
+    
+    # multiprocessing (WARNING:)
+    POOL = multiprocessing.Pool( CPU_Count )  
+    
     S_vec = np.linspace(0, np.log(K), n_bins)[1:-1]
     H_cutoff = cutoff_ratio * np.log(K)
     H_vec = np.linspace(np.log(K), H_cutoff, n_bins)[1:-1]
     
     args = [ (implicit_S_vs_Alpha, S, 0, 1e20, K) for S in S_vec ]
     args = args + [ (implicit_H_vs_Beta, H, 1.e-20, 1e20, K) for H in H_vec ]
+     
+    params = POOL.starmap( get_from_implicit, tqdm.tqdm(args, total=len(args), desc='Pre-computations 1/2', disable=disable) )
+    params = np.asarray( params )
     
-    POOL = multiprocessing.Pool( CPU_Count )
-    results = POOL.starmap( get_from_implicit, tqdm.tqdm(args, total=len(args), desc='Pre-computations 1/2', disable=disable) )
-    POOL.close()
-    results = np.asarray( results )
-    
-    Alpha_vec = results[:len(S_vec)]
-    Beta_vec = results[len(S_vec):]
+    Alpha_vec = params[:len(S_vec)]
+    Beta_vec = params[len(S_vec):]
     
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     #  Compute MeasureMu Alpha and Beta #
@@ -65,13 +67,11 @@ def CamagliaMoraWalczak( compACTdiv, bins=5e2, cutoff_ratio=5, error=False, CPU_
     args = [ (a, compACTdiv.compact_A ) for a in Alpha_vec ]
     args = args + [ (b, compACTdiv.compact_B ) for b in Beta_vec ]
     
-    POOL = multiprocessing.Pool( CPU_Count )
-    results = POOL.starmap( measureMu, tqdm.tqdm(args, total=len(args), desc='Pre-computations 2/2', disable=disable) )
-    POOL.close()
-    results = np.asarray( results )  
+    measures = POOL.starmap( measureMu, tqdm.tqdm(args, total=len(args), desc='Pre-computations 2/2', disable=disable) )
+    measures = np.asarray( measures )  
     
-    mu_a = results[:len(Alpha_vec)]
-    mu_b = results[len(Alpha_vec):]
+    mu_a = measures[:len(Alpha_vec)]
+    mu_b = measures[len(Alpha_vec):]
         
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>
     #  estimator vs alpha,beta  #
@@ -80,10 +80,8 @@ def CamagliaMoraWalczak( compACTdiv, bins=5e2, cutoff_ratio=5, error=False, CPU_
     # WARNING!: this itertools operation is a bottleneck!
     args = [ x[0] + x[1] + (compACTdiv, error,) for x in itertools.product(zip(Alpha_vec,S_vec),zip(Beta_vec,H_vec))]
             
-    POOL = multiprocessing.Pool( CPU_Count ) 
-    results = POOL.starmap( estimates_at_alpha_beta, tqdm.tqdm(args, total=len(args), desc='Grid Evaluations', disable=disable) )
-    POOL.close()
-    results = np.asarray(results)
+    results = POOL.starmap( estimates_at_alpha_beta, tqdm.tqdm(args, total=len(args), desc='Evaluations', disable=disable) )
+    results = np.asarray( results )
     
     # >>>>>>>>>>>>>>>>>
     #   integrations  #
@@ -100,19 +98,20 @@ def CamagliaMoraWalczak( compACTdiv, bins=5e2, cutoff_ratio=5, error=False, CPU_
         all_DKL2_ab_times_sigma = results[:,2].reshape(len(Alpha_vec), len(Beta_vec))
         args = args + [ (mu_b, x, H_vec) for x in all_DKL2_ab_times_sigma ]
         
-    POOL = multiprocessing.Pool( CPU_Count ) 
-    results = POOL.starmap( integral_with_mu, tqdm.tqdm(args, total=len(args), desc='Final Integrations', disable=disable) )
-    POOL.close()
-    results = np.asarray(results)
+    integrations_a = POOL.starmap( integral_with_mu, tqdm.tqdm(args, total=len(args), desc='Integration', disable=disable) )
+    integrations_a = np.asarray(  integrations_a )
     
-    Zeta = integral_with_mu(mu_a, results[:len(Alpha_vec)], S_vec)
-    DKL1 = mp.fdiv(integral_with_mu(mu_a, results[len(Alpha_vec):2*len(Alpha_vec)], S_vec), Zeta)  
+    # multiprocessing (WARNING:)    
+    POOL.close()
+    
+    Zeta = integral_with_mu( mu_a, integrations_a[:len(Alpha_vec)], S_vec )
+    DKL1 = mp.fdiv( integral_with_mu( mu_a, integrations_a[len(Alpha_vec):2*len(Alpha_vec)], S_vec ), Zeta )  
     
     if error is False :       
         kullback_leibler_estimate = np.array(DKL1, dtype=np.float) 
         
     else :
-        DKL2 = mp.fdiv(integral_with_mu(mu_a, results[2*len(Alpha_vec):], S_vec), Zeta)  
+        DKL2 = mp.fdiv( integral_with_mu(mu_a, integrations_a[2*len(Alpha_vec):], S_vec ), Zeta )  
         DKL_devStd = np.sqrt(DKL2 - np.power(DKL1, 2))  
         kullback_leibler_estimate = np.array([DKL1, DKL_devStd], dtype=np.float)   
     
