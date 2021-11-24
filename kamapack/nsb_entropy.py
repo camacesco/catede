@@ -14,13 +14,12 @@ import tqdm
 
 from ._nsb_aux_definitions import *
 
-def NemenmanShafeeBialek( compACTexp, error=False, bins=1e4, progressbar=False ):
+def NemenmanShafeeBialek( compACTexp, error=False, bins=1e4, CPU_Count=None, progressbar=False ):
     '''
     NSB entropy estimator description:
     '''
 
     K = compACTexp.K
-    CPU_Count = multiprocessing.cpu_count()
     
     # >>>>>>>>>>>>>>>>>>>>>>
     #  CHECK user OPTIONS  #
@@ -30,6 +29,13 @@ def NemenmanShafeeBialek( compACTexp, error=False, bins=1e4, progressbar=False )
         n_bins = int(bins)
     except :
         raise TypeError("The parameter `bins` requires an integer value.")
+        
+    try :
+        CPU_Count = int(CPU_Count)
+        if CPU_Count < 1 :
+            raise IOError("The parameter `CPU_Count` requires an integer value greater than 0.")     
+    except :
+        CPU_Count = multiprocessing.cpu_count()
         
     disable = not progressbar
 

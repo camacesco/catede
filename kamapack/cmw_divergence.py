@@ -14,23 +14,29 @@ import tqdm
 
 from ._nsb_aux_definitions import *
 
-def CamagliaMoraWalczak( compACTdiv, bins=1e3, cutoff_ratio=5, error=False, progressbar=False ):
+def CamagliaMoraWalczak( compACTdiv, bins=5e2, cutoff_ratio=5, error=False, CPU_Count=None, progressbar=False ):
     '''
     CMW Kullback-Leibler divergence estimator description:
     '''
 
     K = compACTdiv.K
-    CPU_Count = multiprocessing.cpu_count()
     
     # >>>>>>>>>>>>>>>>>>>>>>
     #  CHECK user OPTIONS  #
     # >>>>>>>>>>>>>>>>>>>>>>
-        
+                 
     try :
         n_bins = int(bins)
     except :
         raise TypeError("The parameter `bins` requires an integer value.")
         
+    try :
+        CPU_Count = int(CPU_Count)
+        if CPU_Count < 1 :
+            raise IOError("The parameter `CPU_Count` requires an integer value greater than 0.")     
+    except :
+        CPU_Count = multiprocessing.cpu_count()
+
     disable = not progressbar 
         
     # >>>>>>>>>>>>>>>>>>>>>>>>>
