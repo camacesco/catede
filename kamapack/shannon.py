@@ -153,6 +153,12 @@ class Experiment( _skeleton_ ) :
         '''
         return _Experiment_Compact_( self )
     
+    def save_compact( self, filename ) :
+        '''
+        It saves the count hist features of Experiment to `filename`.
+        '''
+        self.compact( ).save( filename )
+    
 class _Experiment_Compact_ :
 
     def __init__( self, experiment ) :
@@ -161,6 +167,19 @@ class _Experiment_Compact_ :
         self.Kobs = experiment.obs_n_categ                               # observed number of categories
         self.nn = experiment.counts_hist.index.values                    # counts
         self.ff = experiment.counts_hist.values                          # recurrency of counts
+        
+    def save( self, filename ) : 
+        # parameters
+        pd.DataFrame(
+            [ self.compact().N,  self.compact().K, len(self.compact().ff) ],
+                    index = ['N', 'K', 'size_of_ff']
+        ).to_csv( saveCompExpFileName, sep=' ', mode='w', header=False, index=True )
+        
+        # counts hist
+        pd.DataFrame(
+            { 'nn' : self.compact().nn,
+             'ff' : self.compact().ff }
+        ).to_csv( saveCompExpFileName, sep=' ', mode='a', header=True, index=False )        
         
 ######################
 #  DIVERGENCE CLASS  #
@@ -231,6 +250,12 @@ class Divergence( _skeleton_ ) :
         It provides aliases useful for computations.
         '''
         return _Divergence_Compact_( self )
+        
+    def save_compact( self, filename ) :
+        '''
+        It saves the count hist features of Experiment to `filename`.
+        '''
+        self.compact( ).save( filename )
     
 class _Divergence_Compact_ :
 
@@ -247,3 +272,17 @@ class _Divergence_Compact_ :
         self.nn_A = temp[:,0]                                            # counts for Exp A
         self.nn_B = temp[:,1]                                            # counts for Exp B
         self.ff = divergence.counts_hist.values                          # recurrency of counts
+        
+    def save( self, filename ) : 
+        # parameters
+        pd.DataFrame(
+            [ self.compact().N_A, self.compact().N_B, self.compact().K, len(self.compact().ff) ],
+                    index = ['N_A', 'N_B', 'K', 'size_of_ff']
+        ).to_csv( saveCompExpFileName, sep=' ', mode='w', header=False, index=True )
+        
+        # counts hist
+        pd.DataFrame(
+            { 'nn_A' : self.compact().nn_A,
+             'nn_B' : self.compact().nn_B,
+             'ff' : self.compact().ff }
+        ).to_csv( saveCompExpFileName, sep=' ', mode='a', header=True, index=False ) 
