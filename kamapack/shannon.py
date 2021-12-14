@@ -229,7 +229,7 @@ class Divergence( _skeleton_ ) :
         method: str
                 the name of the Kullback-Leibler estimation method:
                 - "naive": naive estimator (default);
-                - "NSB": Nemenman Shafee Bialek estimator.
+                - "CMW": Nemenman Shafee Bialek estimator.
                 - "Jeffreys": Jeffreys estimator;
                 - "Laplace": Laplace estimator;
                 - "SG": Schurmann-Grassberger estimator;
@@ -244,7 +244,33 @@ class Divergence( _skeleton_ ) :
         '''
         
         return default_divergence.switchboard( self.compact(), method=method, unit=unit, **kwargs )
+
+    def jensen_shannon( self, method="naive", unit="ln", **kwargs ):
+
+        '''
+        Jensen-Shannon divergence estimation over a given Divergence class object through a chosen `method`.
+        The unit of the logarithm can be specified through the parameter `unit`.
+            
+        Parameters
+        ----------
+        method: str
+                the name of the Kullback-Leibler estimation method:
+                - "naive": naive estimator (default);
+                - "Jeffreys": Jeffreys estimator;
+                - "Laplace": Laplace estimator;
+                - "SG": Schurmann-Grassberger estimator;
+                - "minimax": minimax estimator;                          
+        unit: str, optional
+                the entropy logbase unit:
+                - "ln": natural logarithm (default);
+                - "log2": base 2 logarihtm;
+                - "log10":base 10 logarithm.
+
+        return numpy.array
+        '''
         
+        return default_divergence.switchboard( self.compact(), method=method, measure="Jensen-Shannon", unit=unit, **kwargs )
+
     def compact( self ) :
         '''
         It provides aliases useful for computations.
