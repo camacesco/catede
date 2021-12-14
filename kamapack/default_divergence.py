@@ -19,7 +19,7 @@ _unit_Dict_ = { "ln": 1., "log2": 1./np.log(2), "log10": 1./np.log(10) }
 #  SWITCHBOARD  #
 #################
 
-def switchboard( compACT, method="naive", unit=None, **kwargs ):
+def switchboard( compACT, method="naive", unit=None, measure="Kullback-Leibler", **kwargs ):
 
     # loading units
     if unit in _unit_Dict_.keys( ) :
@@ -27,32 +27,38 @@ def switchboard( compACT, method="naive", unit=None, **kwargs ):
     else:
         raise IOError("Unknown unit, please choose amongst ", _unit_Dict_.keys( ) )
 
+    # check measure 
+    if measure not in ["Kullback-Leibler", "Jensen-Shannon"] :
+        raise IOError("Choose `measure` between `Kullback-Leibler` and `Jensen-Shannon`.")
+
     # choosing entropy estimation method
     if method == "naive":                       # Naive
-        dkl_estimate = Naive( compACT, **kwargs )
+        dkl_estimate = Naive( compACT, measure=measure, **kwargs )
     
     elif method == "CMW":                       # Camaglia Mora Walczak
+        if measure is not "Kullback-Leibler" :
+            raise IOError("Unknown method `CMW` for the chosen measure.")
         dkl_estimate = cmw_divergence.CamagliaMoraWalczak( compACT, **kwargs )
     
     elif method == "Jeffreys":                  # Jeffreys
         a = 0.5
         b = 0.5
-        dkl_estimate = Dirichlet( compACT, a, b, **kwargs )
+        dkl_estimate = Dirichlet( compACT, a, b, measure=measure, **kwargs )
     
     elif method == "Laplace":                   # Laplace
         a = 1.
         b = 1.
-        dkl_estimate = Dirichlet( compACT, a, b, **kwargs )
+        dkl_estimate = Dirichlet( compACT, a, b, measure=measure, **kwargs )
     
     elif method == "SG":                        # Schurmann-Grassberger
         a = 1. / compACT.compact_A.Kobs
         b = 1. / compACT.compact_B.Kobs
-        dkl_estimate = Dirichlet( compACT, a, b, **kwargs )
+        dkl_estimate = Dirichlet( compACT, a, b, measure=measure, **kwargs )
         
     elif method == "minimax":                   # minimax
         a = np.sqrt( compACT.N_A ) / compACT.compact_A.Kobs
         b = np.sqrt( compACT.N_B ) / compACT.compact_B.Kobs
-        dkl_estimate = Dirichlet( compACT, a, b, **kwargs )
+        dkl_estimate = Dirichlet( compACT, a, b, measure=measure, **kwargs )
         
     else:
         raise IOError("The chosen method is unknown.")
@@ -66,7 +72,7 @@ def switchboard( compACT, method="naive", unit=None, **kwargs ):
 #  NAIVE  #
 ###########
 
-def Naive( compACT, only_cross=False ) :
+def Naive( compACT, measure="Kullback-Leibler", ) :
     '''
     Replacing probabilities with frequencies without considering categories not seen in one of the two.
     '''
@@ -80,18 +86,21 @@ def Naive( compACT, only_cross=False ) :
     hh_A = nn_A / N_A                  # frequencies
     hh_B = nn_B / N_B                  # frequencies
     
-    if only_cross is True :
-        output = np.dot ( ff, - hh_A * np.log( hh_B ))
-    else :                                   
+    if measure == "Kullback-Leibler" :                       
         output = np.dot ( ff, hh_A * np.log( hh_A / hh_B ) )
-        
+    elif measure == "Jensen-Shannon" :
+        mm_AB = 0.5 * ( hh_A + hh_B )
+        output = 0.5 * np.dot ( ff, hh_A * np.log( hh_A / mm_AB ) + hh_B * np.log( hh_B / mm_AB ) )
+    else :
+        raise IOError("Choose `measure` between `Kullback-Leibler` and `Jensen-Shannon`.")
+
     return np.array( output )
 
 ##########################
 #  DIRICHELET ESTIMATOR  #
 ##########################
 
-def Dirichlet( compACT, a, b, only_cross=False ):
+def Dirichlet( compACT, a, b, measure="Kullback-Leibler",  ):
     '''
     Estimate Kullback-Leibler with Dirichlet-multinomial pseudocount model.
     
@@ -119,11 +128,14 @@ def Dirichlet( compACT, a, b, only_cross=False ):
     
     hh_A_a = nn_A_a / N_A_a             # frequencies
     hh_B_b = nn_B_b / N_B_b             # frequencies
-    
-    if only_cross is True :
-        output = np.dot( ff, - hh_A_a * np.log( hh_B_b ))
-    else :                                   
+     
+    if measure == "Kullback-Leibler" :                               
         output = np.dot( ff, hh_A_a * np.log( hh_A_a / hh_B_b ) )
-        
+    elif measure == "Jensen-Shannon" :
+        mm_AB_ab = 0.5 * ( hh_A_a + hh_B_b )
+        output = 0.5 * np.dot ( ff, hh_A_a * np.log( hh_A_a / mm_AB_ab ) + hh_B_b * np.log( hh_B_b / mm_AB_ab ) )
+    else :
+        raise IOError("Choose `measure` between `Kullback-Leibler` and `Jensen-Shannon`.")
+
     return np.array( output )
 ###
