@@ -5,6 +5,18 @@
     Copyright (C) November 2021 Francesco Camaglia, LPENS 
 '''
 
+'''
+WARNING!: doc inheritance
+class X(object):
+  """This class has a method foo()."""
+  def foo(): pass
+
+class Y(X):
+  __doc__ = X.__doc__ + ' Also bar().'
+  def bar(): pass
+
+'''
+
 import warnings
 
 import numpy as np
@@ -90,8 +102,8 @@ class Experiment( _skeleton_ ) :
                 data_hist = pd.Series( data ).astype(int)
             else :
                 # loading raw list of sequences
-                temp = pd.Series( sequences )
-                data_hist = output.groupby( temp ).size()
+                temp = pd.Series( data )
+                data_hist = temp.groupby( temp ).size()
         else :
             raise TypeError("The parameter `data` has unsopported type.")
 
@@ -151,7 +163,7 @@ class Experiment( _skeleton_ ) :
         '''
         It provides aliases useful for computations.
         '''
-        return _Experiment_Compact_( self )
+        return Experiment_Compact( experiment=self )
     
     def save_compact( self, filename ) :
         '''
@@ -159,28 +171,55 @@ class Experiment( _skeleton_ ) :
         '''
         self.compact( ).save( filename )
     
-class _Experiment_Compact_ :
+class Experiment_Compact :
+    def __init__( self, experiment=None, filename=None ) :
+        '''
+        '''
+        if experiment is not None :
+            self.N = experiment.tot_counts                                   # total number of counts
+            self.K = experiment.usr_n_categ                                  # user number of categories
+            self.Kobs = experiment.obs_n_categ                               # observed number of categories
+            self.nn = experiment.counts_hist.index.values                    # counts
+            self.ff = experiment.counts_hist.values                          # recurrency of counts
+        elif filename is not None :
+            self.load( filename )    
+        else :
+            raise TypeError( 'One between `experiment` and `filename` has to be defined.')
 
-    def __init__( self, experiment ) :
-        self.N = experiment.tot_counts                                   # total number of counts
-        self.K = experiment.usr_n_categ                                  # user number of categories
-        self.Kobs = experiment.obs_n_categ                               # observed number of categories
-        self.nn = experiment.counts_hist.index.values                    # counts
-        self.ff = experiment.counts_hist.values                          # recurrency of counts
-        
     def save( self, filename ) : 
+        '''
+        '''
         # parameters
         pd.DataFrame(
-            [ self.compact().N,  self.compact().K, len(self.compact().ff) ],
-                    index = ['N', 'K', 'size_of_ff']
-        ).to_csv( saveCompExpFileName, sep=' ', mode='w', header=False, index=True )
+            [ self.N, self.K, self.Kobs, len(self.ff) ],
+                    index = ['N', 'K', 'Kobs', 'size_of_ff']
+        ).to_csv( filename, sep=' ', mode='w', header=False, index=True )
         
         # counts hist
         pd.DataFrame(
-            { 'nn' : self.compact().nn,
-             'ff' : self.compact().ff }
-        ).to_csv( saveCompExpFileName, sep=' ', mode='a', header=True, index=False )        
+            { 'nn' : self.nn,
+             'ff' : self.ff }
+        ).to_csv( filename, sep=' ', mode='a', header=True, index=False )        
+
+    def load( self, filename ) : 
+        '''
+        '''
+        # parameters
+        f = open(filename, "r")
+        params = {}
+        for _ in range(4) :
+            thisline = f.readline().strip().split(' ')
+            params[ thisline[0] ] = thisline[1]
+        self.N = int(params[ 'N' ])
+        self.K = int(params['K'])
+        self.Kobs = int(params['Kobs'])
         
+        #count hist
+        df = pd.read_csv( filename, header=4, sep=' ' )
+        assert len(df) == int(params['size_of_ff'])
+        self.nn = df['nn'].values
+        self.ff = df['ff'].values
+
 ######################
 #  DIVERGENCE CLASS  #
 ######################
@@ -243,7 +282,7 @@ class Divergence( _skeleton_ ) :
         return numpy.array
         '''
         
-        return default_divergence.switchboard( self.compact(), method=method, unit=unit, **kwargs )
+        return default_divergence.switchboard( self.compact(), measure="Kullback-Leibler", method=method, unit=unit, **kwargs )
 
     def jensen_shannon( self, method="naive", unit="ln", **kwargs ):
 
@@ -275,7 +314,7 @@ class Divergence( _skeleton_ ) :
         '''
         It provides aliases useful for computations.
         '''
-        return _Divergence_Compact_( self )
+        return Divergence_Compact( self )
         
     def save_compact( self, filename ) :
         '''
@@ -283,32 +322,63 @@ class Divergence( _skeleton_ ) :
         '''
         self.compact( ).save( filename )
     
-class _Divergence_Compact_ :
+class Divergence_Compact :
+    def __init__( self, divergence=None, filename=None ) :
+        '''
+        '''
 
-    def __init__( self, divergence ) :
+        if divergence is not None :
+            self.compact_A = divergence.exp_A.compact()                      # compact for Exp A
+            self.compact_B = divergence.exp_B.compact()                      # compact for Exp B
+            
+            self.N_A = divergence.tot_counts['Exp-A']                        # total number of counts for Exp A
+            self.N_B = divergence.tot_counts['Exp-B']                        # total number of counts for Exp B
+            self.K = divergence.usr_n_categ                                  # user number of categories
+            self.Kobs = divergence.obs_n_categ                               # observed number of categories
+            temp = np.array(list(map(lambda x: [x[0],x[1]], divergence.counts_hist.index.values)))
+            self.nn_A = temp[:,0]                                            # counts for Exp A
+            self.nn_B = temp[:,1]                                            # counts for Exp B
+            self.ff = divergence.counts_hist.values                          # recurrency of counts
+        
+        elif filename is not None :
+            self.load( filename )
+        
+        else :
+            raise TypeError( 'One between `experiment` and `filename` has to be defined.')
 
-        self.compact_A = divergence.exp_A.compact()                      # compact for Exp A
-        self.compact_B = divergence.exp_B.compact()                      # compact for Exp B
-        
-        self.N_A = divergence.tot_counts['Exp-A']                        # total number of counts for Exp A
-        self.N_B = divergence.tot_counts['Exp-B']                        # total number of counts for Exp B
-        self.K = divergence.usr_n_categ                                  # user number of categories
-        self.Kobs = divergence.obs_n_categ                               # observed number of categories
-        temp = np.array(list(map(lambda x: [x[0],x[1]], divergence.counts_hist.index.values)))
-        self.nn_A = temp[:,0]                                            # counts for Exp A
-        self.nn_B = temp[:,1]                                            # counts for Exp B
-        self.ff = divergence.counts_hist.values                          # recurrency of counts
-        
     def save( self, filename ) : 
+        '''
+        '''
         # parameters
         pd.DataFrame(
-            [ self.compact().N_A, self.compact().N_B, self.compact().K, len(self.compact().ff) ],
-                    index = ['N_A', 'N_B', 'K', 'size_of_ff']
-        ).to_csv( saveCompExpFileName, sep=' ', mode='w', header=False, index=True )
+            [ self.N_A, self.N_B, self.K, self.Kobs, len(self.ff) ],
+                    index = ['N_A', 'N_B', 'K', 'Kobs', 'size_of_ff']
+        ).to_csv( filename, sep=' ', mode='w', header=False, index=True )
         
         # counts hist
         pd.DataFrame(
-            { 'nn_A' : self.compact().nn_A,
-             'nn_B' : self.compact().nn_B,
-             'ff' : self.compact().ff }
-        ).to_csv( saveCompExpFileName, sep=' ', mode='a', header=True, index=False ) 
+            { 'nn_A' : self.nn_A,
+             'nn_B' : self.nn_B,
+             'ff' : self.ff }
+        ).to_csv( filename, sep=' ', mode='a', header=True, index=False ) 
+    
+    def load( self, filename ) : 
+        '''
+        '''
+        # parameters
+        f = open(filename, "r")
+        params = {}
+        for _ in range(5) :
+            thisline = f.readline().strip().split(' ')
+            params[ thisline[0] ] = thisline[1]
+        self.N_A = params['N_A']
+        self.N_B = params['N_B']
+        self.K = params['K']
+        self.Kobs = params['Kobs']
+
+        #count hist
+        df = pd.read_csv( filename, header=5, sep=' ' )
+        assert len(df) == params['size_of_ff']
+        self.nn_A = df['nn_A'].values
+        self.nn_B = df['nn_B'].values
+        self.ff = df['ff'].values

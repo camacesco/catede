@@ -61,11 +61,11 @@ def NemenmanShafeeBialek( compACTexp, error=False, bins=1e4, CPU_Count=None, pro
     # >>>>>>>>>>>>>>>>>>>>>>>
     
     args = [ ( alpha, compACTexp ) for alpha in Alpha_vec ]
-    all_S1_a = POOL.starmap( estimate_S_at_alpha, tqdm.tqdm(args, total=len(args), desc="Evaluation", disable=disable) )
+    all_S1_a = POOL.starmap( estimate_S_at_alpha, tqdm.tqdm(args, total=len(args), desc="Estimator Eval", disable=disable) )
     all_S1_a = np.asarray(all_S1_a)
     
     if error is True :
-        all_S2_a = POOL.starmap( estimate_S2_at_alpha, tqdm.tqdm(args, total=len(args), desc="Evaluation", disable=disable) )
+        all_S2_a = POOL.starmap( estimate_S2_at_alpha, tqdm.tqdm(args, total=len(args), desc="Error Eval", disable=disable) )
         all_S2_a = np.asarray(all_S2_a)
     
     # multiprocessing (WARNING:)    

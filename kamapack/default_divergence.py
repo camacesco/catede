@@ -36,7 +36,7 @@ def switchboard( compACT, method="naive", unit=None, measure="Kullback-Leibler",
         dkl_estimate = Naive( compACT, measure=measure, **kwargs )
     
     elif method == "CMW":                       # Camaglia Mora Walczak
-        if measure is not "Kullback-Leibler" :
+        if measure != "Kullback-Leibler" :
             raise IOError("Unknown method `CMW` for the chosen measure.")
         dkl_estimate = cmw_divergence.CamagliaMoraWalczak( compACT, **kwargs )
     
