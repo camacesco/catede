@@ -43,7 +43,6 @@ def CamagliaMoraWalczak( compACTdiv, bins=5e2, cutoff_ratio=5, error=False, CPU_
     #  Compute Alpha and Beta #
     # >>>>>>>>>>>>>>>>>>>>>>>>>
     
-    
     # multiprocessing (WARNING:)
     POOL = multiprocessing.Pool( CPU_Count )  
     
@@ -72,29 +71,31 @@ def CamagliaMoraWalczak( compACTdiv, bins=5e2, cutoff_ratio=5, error=False, CPU_
     
     mu_a = measures[:len(Alpha_vec)]
     mu_b = measures[len(Alpha_vec):]
+    # regualarization 
+    mu_a /= np.max( mu_a )
+    mu_b /= np.max( mu_b )
                 
-    # >>>>>>>>>>>>>>>>>>
-    #  Compute Sigma   #
-    # >>>>>>>>>>>>>>>>>>
+    # >>>>>>>>>>>>>>>>
+    #  Compute Phi   #
+    # >>>>>>>>>>>>>>>>
         
     # WARNING!: this itertools operation is a bottleneck!
     args = [ x + (compACTdiv.K,) for x in itertools.product(S_vec, H_vec)]
             
-    all_sigma = POOL.starmap( Sigma, tqdm.tqdm(args, total=len(args), 
+    all_phi = POOL.starmap( Phi, tqdm.tqdm(args, total=len(args), 
                                                desc='Pre-computations 3/3', disable=disable) )
-    all_sigma = np.asarray( all_sigma ).reshape(len(S_vec), len(H_vec))
+    all_phi = np.asarray( all_phi ).reshape(len(S_vec), len(H_vec))
     
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     #  DKL estimator vs alpha,beta  #
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         
-    # WARNING!: this itertools operation is a bottleneck!
-    args = [ x[0] + x[1] + (compACTdiv,) for x in itertools.product(zip(Alpha_vec,S_vec),zip(Beta_vec,H_vec))]
+    args = [ x + (compACTdiv,) for x in itertools.product(Alpha_vec,Beta_vec)]
             
     all_DKL_ab = POOL.starmap( estimate_DKL_at_alpha_beta, tqdm.tqdm(args, total=len(args), 
                                                                      desc='Evaluations', disable=disable) )
     all_DKL_ab = np.asarray( all_DKL_ab ).reshape(len(S_vec), len(H_vec))
-    all_DKL_ab_times_sigma = np.multiply( all_sigma, all_DKL_ab )
+    all_DKL_ab_times_phi = np.multiply( all_phi, all_DKL_ab )
     
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     #  DKL2 estimator vs alpha,beta  #
@@ -104,17 +105,17 @@ def CamagliaMoraWalczak( compACTdiv, bins=5e2, cutoff_ratio=5, error=False, CPU_
         all_DKL2_ab = POOL.starmap( estimate_DKL2_at_alpha_beta, tqdm.tqdm(args, total=len(args), 
                                                                          desc='Error evaluations', disable=disable) )
         all_DKL2_ab = np.asarray( all_DKL2_ab ).reshape(len(S_vec), len(H_vec))
-        all_DKL2_ab_times_sigma = np.multiply( all_sigma, all_DKL2_ab )
+        all_DKL2_ab_times_phi = np.multiply( all_phi, all_DKL2_ab )
     
     # >>>>>>>>>>>>>>>>>
     #   integrations  #
     # >>>>>>>>>>>>>>>>>
                 
-    args = [ (mu_b, x, H_vec) for x in all_sigma ]
-    args = args + [ (mu_b, x, H_vec) for x in all_DKL_ab_times_sigma ]
+    args = [ (mu_b, x, H_vec) for x in all_phi ]
+    args = args + [ (mu_b, x, H_vec) for x in all_DKL_ab_times_phi ]
     
     if error is True :    
-        args = args + [ (mu_b, x, H_vec) for x in all_DKL2_ab_times_sigma ]
+        args = args + [ (mu_b, x, H_vec) for x in all_DKL2_ab_times_phi ]
         
     integrations_a = POOL.starmap( integral_with_mu, tqdm.tqdm(args, total=len(args), desc='Integration', disable=disable) )
     integrations_a = np.asarray(  integrations_a )
@@ -123,8 +124,9 @@ def CamagliaMoraWalczak( compACTdiv, bins=5e2, cutoff_ratio=5, error=False, CPU_
     POOL.close()
     
     Zeta = integral_with_mu( mu_a, integrations_a[:len(Alpha_vec)], S_vec )
-    DKL1 = mp.fdiv( integral_with_mu( mu_a, integrations_a[len(Alpha_vec):2*len(Alpha_vec)], S_vec ), Zeta )  
-    
+    DKL1 = integral_with_mu( mu_a, integrations_a[len(Alpha_vec):2*len(Alpha_vec)], S_vec ) 
+    DKL1 = mp.fdiv( DKL1, Zeta )  
+
     if error is False :       
         kullback_leibler_estimate = np.array(DKL1, dtype=np.float) 
         
@@ -136,11 +138,11 @@ def CamagliaMoraWalczak( compACTdiv, bins=5e2, cutoff_ratio=5, error=False, CPU_
     return kullback_leibler_estimate
 
 
-###########
-#  SIGMA  #
-###########
+#########
+#  PHI  #
+#########
 
-def Sigma( S, H, K ) :
+def Phi( S, H, K ) :
     z = H - S
     if z >= np.log(K) :
         return 1. / np.log(K)
@@ -152,7 +154,7 @@ def Sigma( S, H, K ) :
 #########################################
 
 
-def estimate_DKL_at_alpha_beta( a, S, b, H, compACTdiv ):
+def estimate_DKL_at_alpha_beta( a, b, compACTdiv ):
     '''
     It returns D_KL.
     '''
@@ -164,11 +166,11 @@ def estimate_DKL_at_alpha_beta( a, S, b, H, compACTdiv ):
     
     # DKL computation
     temp = ff.dot( (nn_A+a) * ( D_polyGmm(0, N_B+K*b, nn_B+b) - D_polyGmm(0, N_A+K*a+1, nn_A+a+1) ) ) 
-    DKL_ab_times_sigma = mp.fdiv( temp, N_A+K*a )    
+    DKL_ab = mp.fdiv( temp, N_A+K*a )    
             
-    return DKL_ab_times_sigma
+    return DKL_ab
 
-def estimate_DKL2_at_alpha_beta( a, S, b, H, compACTdiv ) :
+def estimate_DKL2_at_alpha_beta( a, b, compACTdiv ) :
     '''
     It returns D_KL2.
     '''
