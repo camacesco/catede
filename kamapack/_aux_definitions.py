@@ -14,12 +14,21 @@ from scipy import optimize
 ##############
 #  NOTATION  #
 ##############
+def diGmm(x) :    
+    '''Digamma function (polygamma of order 0).'''
+    return polygamma(0, x)
 
-def D_polyGmm(order, x, y):
-    '''
-    Difference between same `order` polygamma functions, computed in `x` and `y`.
-    '''
-    return polygamma(order,x) - polygamma(order,y)  
+def triGmm(x) :    
+    '''Trigamma function (polygamma of order 1).'''
+    return polygamma(1, x)
+
+def D_diGmm(x, y):
+    '''Difference between digamma functions in `x` and `y`.'''
+    return diGmm(x) - diGmm(y)  
+
+def D_triGmm(x, y):
+    '''Difference between trigamma functions in `x` and `y`.'''
+    return triGmm(x) - triGmm(y)  
 
 def LogGmm( x ): 
     ''' alias '''
@@ -64,12 +73,12 @@ def implicit_S_vs_Alpha( alpha, S, K ):
     '''
     implicit relation to be inverted.
     '''
-    return D_polyGmm( 0, K * alpha + 1, alpha + 1 ) - S   
+    return D_diGmm( K * alpha + 1, alpha + 1 ) - S   
 
 def implicit_H_vs_Beta( beta, x, K ):
     '''
     implicit relation to be inverted.
     '''
-    return D_polyGmm( 0, K * beta , beta ) - x
+    return D_diGmm( K * beta , beta ) - x
 
     

@@ -12,7 +12,7 @@ from scipy import optimize
 import multiprocessing
 import tqdm
 
-from ._nsb_aux_definitions import *
+from ._aux_definitions import *
 
 def NemenmanShafeeBialek( compACTexp, error=False, bins=1e4, CPU_Count=None, progressbar=False ):
     '''
@@ -108,7 +108,7 @@ def estimate_S_at_alpha( a, compACTexp ):
     N, nn, ff, K = compACTexp.N, compACTexp.nn, compACTexp.ff, compACTexp.K
     
     # entropy computation
-    temp = ff.dot( (nn+a) * D_polyGmm(0, N+K*a+1, nn+a+1) )     
+    temp = ff.dot( (nn+a) * D_diGmm(N+K*a+1, nn+a+1) )     
     S1_a = mp.fdiv( temp, N+K*a )
 
     return S1_a
@@ -121,11 +121,11 @@ def estimate_S2_at_alpha( a, compACTexp ) :
     N, nn, ff, K = compACTexp.N, compACTexp.nn, compACTexp.ff, compACTexp.K
     
     # single sum term
-    single_sum = np.power(D_polyGmm(0, nn+a+2, N+K*a+2), 2) + D_polyGmm(1, nn+a+2, N+K*a+2)
+    single_sum = np.power(D_diGmm(nn+a+2, N+K*a+2), 2) + D_triGmm(nn+a+2, N+K*a+2)
     Ss = (nn+a+1) * (nn+a) * single_sum
     
     # double sum term 
-    double_sum = D_polyGmm(0, nn+a+1, N+K*a+2)[:,None] * D_polyGmm(0, nn+a+1, N+K*a+2) - polygamma(1, N+K*a+2)
+    double_sum = D_diGmm(nn+a+1, N+K*a+2)[:,None] * D_diGmm(nn+a+1, N+K*a+2) - triGmm(N+K*a+2)
     Ds = ( (nn+a)[:,None] * (nn+a) ) * double_sum
             
     output = ff.dot( Ss - Ds.diagonal() + Ds.dot(ff) )

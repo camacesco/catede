@@ -2,40 +2,33 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) November 2021 Francesco Camaglia, LPENS 
-'''
-
-'''
-WARNING!: doc inheritance
-class X(object):
-  """This class has a method foo()."""
-  def foo(): pass
-
-class Y(X):
-  __doc__ = X.__doc__ + ' Also bar().'
-  def bar(): pass
-
+    Copyright (C) January 2022 Francesco Camaglia, LPENS 
 '''
 
 import warnings
-
 import numpy as np
 import pandas as pd
-
 from . import default_entropy, default_divergence
 
 class _skeleton_ :
 
+    '''
+    update_categories( categories )
+        Change the number of categories.
+    show
+        Print a short summary.
+    '''
+
     def update_categories( self, categories ):
-        '''
-        To change the number of categories.
+        '''Change the number of categories.
 
         Parameters
         ----------        
-        categories: scalar
-                The new number of categories of the system. If the value is lower than observed number of categories, 
-                the observed number is used instead. Default is observed number.
-        '''
+        categories : scalar
+                The new number of categories of the system (int or float). 
+                If the value is lower than the observed number of categories, 
+                the observed number is used instead.'''
+
         if categories is None:
             self.usr_n_categ = self.obs_n_categ    
         else :
@@ -51,9 +44,7 @@ class _skeleton_ :
                     warnings.warn("The parameter `categories` is set equal to the observed number of categories.")
     
     def show( self ):
-        '''
-        To print a short summary.
-        '''
+        '''Print a short summary.'''
         
         print("Total number of counts:")
         if type(self.tot_counts) == pd.Series :
@@ -66,22 +57,33 @@ class _skeleton_ :
         print(self.usr_n_categ, ' (a priori)')
         
         print("Recurrencies:")
-        if type(self.counts_hist) == pd.Series :
-            print(self.counts_hist.to_string())
-        else :
-            print(self.counts_hist)
+        print(self.counts_hist)
+
         
 ######################
 #  EXPERIMENT CLASS  #
 ######################
 
 class Experiment( _skeleton_ ) :
+
+    '''The basic class for estimating entropy from dataset distribution.
+    
+    Methods
+    -------
+    entropy( method="naive", unit="ln", **kwargs )
+        Estimate Shannon entropy.'''
+
+    __doc__ += _skeleton_.__doc__
     
     def __init__( self, data, categories=None, iscount=False ):
         '''
-        TO BE UPDATED
         Parameters
-        ----------      
+        ----------    
+        data : Union[dict, pd.DataFrame, pd.Series, list, np.array] 
+            pd.DataFrame (deprecated)
+        categories : scalar, optional
+        iscount : bool
+            (default is False)
         '''
         
         #  Load data  #
@@ -124,35 +126,32 @@ class Experiment( _skeleton_ ) :
         self.update_categories( categories )
         if self.usr_n_categ > self.obs_n_categ :
             self.counts_hist[ 0 ] = self.usr_n_categ - self.obs_n_categ
-            self.counts_hist = self.counts_hist.sort_index(ascending=True)     
-    '''
-    Methods
-    -------
-    '''
+            self.counts_hist = self.counts_hist.sort_index(ascending=True) 
 
     def entropy( self, method="naive", unit="ln", **kwargs ):
-        '''
-        Shannon entropy estimation over a given Experiment class object with a chosen `method`.
-        The unit of the logarithm can be specified through the parameter `unit`.
+        '''Estimate Shannon entropy.
+
+        Shannon entropy estimation through a chosen `method`.
+        The unit (of the logarithm) can be specified with the parameter `unit`.
             
         Parameters
         ----------
         method: str
-                the name of the entropy estimation method:
-                - "naive": naive estimator (default);
-                - "MM": Miller Madow estimator;
-                - "CS": Chao Shen estimator;       
-                - "shrink": shrinkage estimator;       
-                - "Jeffreys": Jeffreys estimator;
-                - "Laplace": Laplace estimator;
-                - "SG": Schurmann-Grassberger estimator;
-                - "minimax": minimax estimator;
-                - "NSB": Nemenman Shafee Bialek estimator.
+            the name of the entropy estimation method:
+            - "naive": naive estimator (default);
+            - "MM": Miller Madow estimator;
+            - "CS": Chao Shen estimator;       
+            - "shrink": shrinkage estimator;       
+            - "Jeffreys": Jeffreys estimator;
+            - "Laplace": Laplace estimator;
+            - "SG": Schurmann-Grassberger estimator;
+            - "minimax": minimax estimator;
+            - "NSB": Nemenman Shafee Bialek estimator.
         unit: str, optional
-                the entropy logbase unit:
-                - "ln": natural logarithm (default);
-                - "log2": base 2 logarihtm;
-                - "log10":base 10 logarithm.
+            the entropy logbase unit:
+            - "ln": natural logarithm (default);
+            - "log2": base 2 logarihtm;
+            - "log10":base 10 logarithm.
 
         return numpy.array
         '''
@@ -160,17 +159,13 @@ class Experiment( _skeleton_ ) :
         return default_entropy.switchboard( self.compact(), method=method, unit=unit, **kwargs )
     
     def compact( self ) :
-        '''
-        It provides aliases useful for computations.
-        '''
+        '''It provides aliases for computations.'''
         return Experiment_Compact( experiment=self )
     
     def save_compact( self, filename ) :
-        '''
-        It saves the count hist features of Experiment to `filename`.
-        '''
+        '''It saves the compact features of Experiment to `filename`.'''
         self.compact( ).save( filename )
-    
+
 class Experiment_Compact :
     def __init__( self, experiment=None, filename=None ) :
         '''
@@ -224,9 +219,31 @@ class Experiment_Compact :
 #  DIVERGENCE CLASS  #
 ######################
 
+
 class Divergence( _skeleton_ ) :
     
+    '''The basic class for estimating divergence between two dataset distributions.
+
+    Methods
+    -------
+    jensen_shannon( method="naive", unit="ln", **kwargs ):
+        Estimate Jensen-Shannon divergence.
+    kullback_leibler( method="naive", unit="ln", **kwargs )
+        Estimate Kullback-Leibler divergence.'''
+
+    __doc__ += _skeleton_.__doc__
+
     def __init__( self, my_exp_A, my_exp_B ) :
+        '''
+        Parameters
+        ----------    
+        my_exp_A : class Experiment
+            the first dataset.
+        my_exp_B : class Experiment
+            the second dataset.
+        '''
+
+        # WARNING!: add option to avoid create experiment at first
         
         self.tot_counts = pd.Series({"Exp-A": my_exp_A.tot_counts,
                                      "Exp-B": my_exp_B.tot_counts})
@@ -253,73 +270,65 @@ class Divergence( _skeleton_ ) :
         self.exp_B = my_exp_B
         self.exp_B.update_categories( self.usr_n_categ )
         
-    '''
-    Methods
-    -------
-    '''
-
     def kullback_leibler( self, method="naive", unit="ln", **kwargs ):
-        '''
-        Kullback-Leibler divergence estimation over a given Divergence class object through a chosen `method`.
-        The unit of the logarithm can be specified through the parameter `unit`.
+        '''Estimate Kullback-Leibler divergence.
+
+        Kullback-Leibler divergence estimation through a chosen `method`.
+        The unit (of the logarithm) can be specified with the parameter `unit`.
             
         Parameters
         ----------
         method: str
-                the name of the Kullback-Leibler estimation method:
-                - "naive": naive estimator (default);
-                - "CMW": Nemenman Shafee Bialek estimator.
-                - "Jeffreys": Jeffreys estimator;
-                - "Laplace": Laplace estimator;
-                - "SG": Schurmann-Grassberger estimator;
-                - "minimax": minimax estimator;                          
+            the name of the estimation method:
+            - "naive" : naive estimator (default);
+            - "CMW" : Camaglia Mora Walczak estimator.
+            - "Jeffreys" : Jeffreys estimator;
+            - "Laplace" : Laplace estimator;
+            - "SG" : Schurmann-Grassberger estimator;
+            - "minimax" : minimax estimator;   
         unit: str, optional
-                the entropy logbase unit:
-                - "ln": natural logarithm (default);
-                - "log2": base 2 logarihtm;
-                - "log10":base 10 logarithm.
+            the divergence logbase unit:
+            - "ln": natural logarithm (default);
+            - "log2": base 2 logarihtm;
+            - "log10":base 10 logarithm.
 
         return numpy.array
         '''
         
-        return default_divergence.switchboard( self.compact(), measure="Kullback-Leibler", method=method, unit=unit, **kwargs )
+        return default_divergence.switchboard( self.compact(), which="Kullback-Leibler", method=method, unit=unit, **kwargs )
 
     def jensen_shannon( self, method="naive", unit="ln", **kwargs ):
+        '''Estimate Jensen-Shannon divergence.
 
-        '''
-        Jensen-Shannon divergence estimation over a given Divergence class object through a chosen `method`.
-        The unit of the logarithm can be specified through the parameter `unit`.
+        Jensen-Shannon divergence estimation through a chosen `method`.
+        The unit (of the logarithm) can be specified with the parameter `unit`.
             
         Parameters
         ----------
         method: str
-                the name of the Kullback-Leibler estimation method:
-                - "naive": naive estimator (default);
-                - "Jeffreys": Jeffreys estimator;
-                - "Laplace": Laplace estimator;
-                - "SG": Schurmann-Grassberger estimator;
-                - "minimax": minimax estimator;                          
+            the name of the estimation method:
+            - "naive" : naive estimator (default);
+            - "Jeffreys" : Jeffreys estimator;
+            - "Laplace" : Laplace estimator;
+            - "SG" : Schurmann-Grassberger estimator;
+            - "minimax" : minimax estimator;   
         unit: str, optional
-                the entropy logbase unit:
-                - "ln": natural logarithm (default);
-                - "log2": base 2 logarihtm;
-                - "log10":base 10 logarithm.
+            the divergence logbase unit:
+            - "ln": natural logarithm (default);
+            - "log2": base 2 logarihtm;
+            - "log10":base 10 logarithm.
 
         return numpy.array
         '''
         
-        return default_divergence.switchboard( self.compact(), method=method, measure="Jensen-Shannon", unit=unit, **kwargs )
+        return default_divergence.switchboard( self.compact(), method=method, which="Jensen-Shannon", unit=unit, **kwargs )
 
     def compact( self ) :
-        '''
-        It provides aliases useful for computations.
-        '''
+        '''It provides aliases for computations.'''
         return Divergence_Compact( self )
         
     def save_compact( self, filename ) :
-        '''
-        It saves the count hist features of Experiment to `filename`.
-        '''
+        '''It saves the count hist features of Experiment to `filename`.'''
         self.compact( ).save( filename )
     
 class Divergence_Compact :
@@ -349,6 +358,7 @@ class Divergence_Compact :
     def save( self, filename ) : 
         '''
         '''
+
         # parameters
         pd.DataFrame(
             [ self.N_A, self.N_B, self.K, self.Kobs, len(self.ff) ],
@@ -365,6 +375,7 @@ class Divergence_Compact :
     def load( self, filename ) : 
         '''
         '''
+
         # parameters
         f = open(filename, "r")
         params = {}
