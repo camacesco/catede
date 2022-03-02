@@ -3,7 +3,7 @@
 
 '''
     Nemenmann-Shafee-Bialek Auxilary Definitions
-    Copyright (C) November 2021 Francesco Camaglia, LPENS 
+    Copyright (C) March 2022 Francesco Camaglia, LPENS 
 '''
 
 import numpy as np
@@ -34,7 +34,7 @@ def LogGmm( x ):
     ''' alias '''
     return loggamma( x ).real    
 
-def measureMu( a, compACT ) :
+def measureMu( alpha, compACT ) :
     '''
     Measure Mu term in the posterior estimators computed as the exponent of an exponential.
     '''
@@ -42,9 +42,11 @@ def measureMu( a, compACT ) :
     # loading parameters from compACT        
     N, nn, ff, K = compACT.N, compACT.nn, compACT.ff, compACT.K
     
-    # mu computation    
-    LogMu = LogGmm( K*a ) - K * LogGmm( a )                   # Dirichelet prior normalization contribution
-    LogMu += ff.dot( LogGmm(nn+a) ) - LogGmm( N + K*a )       # posterior contribution
+    # mu computation  :  
+    # Dirichelet prior normalization contribution
+    LogMu = LogGmm( K*alpha ) - K * LogGmm( alpha )                  
+    # posterior contribution 
+    LogMu += ff.dot( LogGmm(nn+alpha) ) - LogGmm( N + K*alpha )       
 
     return mp.exp( LogMu )
 
@@ -69,16 +71,16 @@ def get_from_implicit( implicit_relation, y, lower, upper, *args,
                              args=( y , *args ), xtol=xtol, maxiter=maxiter )
     return output
                                                   
-def implicit_S_vs_Alpha( alpha, S, K ):
+def implicit_entropy_vs_alpha( alpha, entropy, K ):
     '''
     implicit relation to be inverted.
     '''
-    return D_diGmm( K * alpha + 1, alpha + 1 ) - S   
+    return D_diGmm( K * alpha + 1, alpha + 1 ) - entropy
 
-def implicit_H_vs_Beta( beta, x, K ):
+def implicit_crossentropy_vs_beta( beta, crossentropy, K ):
     '''
     implicit relation to be inverted.
     '''
-    return D_diGmm( K * beta , beta ) - x
+    return D_diGmm( K * beta , beta ) - crossentropy
 
     

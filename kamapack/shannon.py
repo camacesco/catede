@@ -233,31 +233,31 @@ class Divergence( _skeleton_ ) :
 
     __doc__ += _skeleton_.__doc__
 
-    def __init__( self, my_exp_A, my_exp_B ) :
+    def __init__( self, my_exp_1, my_exp_2 ) :
         '''
         Parameters
         ----------    
-        my_exp_A : class Experiment
+        my_exp_1 : class Experiment
             the first dataset.
-        my_exp_B : class Experiment
+        my_exp_2 : class Experiment
             the second dataset.
         '''
 
         # WARNING!: add option to avoid create experiment at first
         
-        self.tot_counts = pd.Series({"Exp-A": my_exp_A.tot_counts,
-                                     "Exp-B": my_exp_B.tot_counts})
+        self.tot_counts = pd.Series({"Exp-1": my_exp_1.tot_counts,
+                                     "Exp-2": my_exp_2.tot_counts})
 
-        df = pd.concat( [my_exp_A.data_hist, my_exp_B.data_hist], axis=1 )
+        df = pd.concat( [my_exp_1.data_hist, my_exp_2.data_hist], axis=1 )
         df = df.replace(np.nan, 0).astype(int)
-        df.columns = ["Exp-A", "Exp-B"]
+        df.columns = ["Exp-1", "Exp-2"]
       
         self.data_hist = df
         self.obs_n_categ = len( df )
         
-        self.counts_hist = df.groupby(by=["Exp-A", "Exp-B"]).size()
+        self.counts_hist = df.groupby(by=["Exp-1", "Exp-2"]).size()
         
-        categories = np.max([my_exp_A.usr_n_categ, my_exp_B.usr_n_categ])
+        categories = np.max([my_exp_1.usr_n_categ, my_exp_2.usr_n_categ])
         self.update_categories( categories )
         if self.usr_n_categ > self.obs_n_categ :
             self.counts_hist[(0,0)] = self.usr_n_categ - self.obs_n_categ
@@ -265,10 +265,10 @@ class Divergence( _skeleton_ ) :
         
         # WARNING!: is this a deep copy ?
         
-        self.exp_A = my_exp_A
-        self.exp_A.update_categories( self.usr_n_categ )
-        self.exp_B = my_exp_B
-        self.exp_B.update_categories( self.usr_n_categ )
+        self.exp_1 = my_exp_1
+        self.exp_1.update_categories( self.usr_n_categ )
+        self.exp_2 = my_exp_2
+        self.exp_2.update_categories( self.usr_n_categ )
         
     def kullback_leibler( self, method="naive", unit="ln", **kwargs ):
         '''Estimate Kullback-Leibler divergence.
@@ -280,12 +280,13 @@ class Divergence( _skeleton_ ) :
         ----------
         method: str
             the name of the estimation method:
-            - "naive" : naive estimator (default);
+            - ["naive", "maximum-likelihood"] : naive estimator (default);
             - "CMW" : Camaglia Mora Walczak estimator.
-            - "Jeffreys" : Jeffreys estimator;
-            - "Laplace" : Laplace estimator;
-            - "SG" : Schurmann-Grassberger estimator;
-            - "minimax" : minimax estimator;   
+            - ["Jeffreys", "Krichevsky-Trofimov"] : Jeffreys estimator;
+            - ["L", "Laplace", "Bayesian-Laplace"] : Laplace estimator;
+            - ["SG", "Schurmann-Grassberger"] : Schurmann-Grassberger estimator;
+            - ["minimax", "Trybula"] : minimax estimator; 
+            - ["D", "Dirichlet"] : Dirichlet   
         unit: str, optional
             the divergence logbase unit:
             - "ln": natural logarithm (default);
@@ -307,11 +308,12 @@ class Divergence( _skeleton_ ) :
         ----------
         method: str
             the name of the estimation method:
-            - "naive" : naive estimator (default);
-            - "Jeffreys" : Jeffreys estimator;
-            - "Laplace" : Laplace estimator;
-            - "SG" : Schurmann-Grassberger estimator;
-            - "minimax" : minimax estimator;   
+            - ["naive", "maximum-likelihood"] : naive estimator (default);
+            - ["Jeffreys", "Krichevsky-Trofimov"] : Jeffreys estimator;
+            - ["L", "Laplace", "Bayesian-Laplace"] : Laplace estimator;
+            - ["SG", "Schurmann-Grassberger"] : Schurmann-Grassberger estimator;
+            - ["minimax", "Trybula"] : minimax estimator; 
+            - ["D", "Dirichlet"] : Dirichlet    
         unit: str, optional
             the divergence logbase unit:
             - "ln": natural logarithm (default);
@@ -337,16 +339,16 @@ class Divergence_Compact :
         '''
 
         if divergence is not None :
-            self.compact_A = divergence.exp_A.compact()                      # compact for Exp A
-            self.compact_B = divergence.exp_B.compact()                      # compact for Exp B
+            self.compact_1 = divergence.exp_1.compact()                      # compact for Exp 1
+            self.compact_2 = divergence.exp_2.compact()                      # compact for Exp 2
             
-            self.N_A = divergence.tot_counts['Exp-A']                        # total number of counts for Exp A
-            self.N_B = divergence.tot_counts['Exp-B']                        # total number of counts for Exp B
+            self.N_1 = divergence.tot_counts['Exp-1']                        # total number of counts for Exp 1
+            self.N_2 = divergence.tot_counts['Exp-2']                        # total number of counts for Exp 2
             self.K = divergence.usr_n_categ                                  # user number of categories
             self.Kobs = divergence.obs_n_categ                               # observed number of categories
             temp = np.array(list(map(lambda x: [x[0],x[1]], divergence.counts_hist.index.values)))
-            self.nn_A = temp[:,0]                                            # counts for Exp A
-            self.nn_B = temp[:,1]                                            # counts for Exp B
+            self.nn_1 = temp[:,0]                                            # counts for Exp 1
+            self.nn_2 = temp[:,1]                                            # counts for Exp 2
             self.ff = divergence.counts_hist.values                          # recurrency of counts
         
         elif filename is not None :
@@ -361,15 +363,13 @@ class Divergence_Compact :
 
         # parameters
         pd.DataFrame(
-            [ self.N_A, self.N_B, self.K, self.Kobs, len(self.ff) ],
-                    index = ['N_A', 'N_B', 'K', 'Kobs', 'size_of_ff']
+            [ self.N_1, self.N_2, self.K, self.Kobs, len(self.ff) ],
+                    index = ['N_1', 'N_2', 'K', 'Kobs', 'size_of_ff']
         ).to_csv( filename, sep=' ', mode='w', header=False, index=True )
         
         # counts hist
         pd.DataFrame(
-            { 'nn_A' : self.nn_A,
-             'nn_B' : self.nn_B,
-             'ff' : self.ff }
+            { 'nn_1' : self.nn_1, 'nn_2' : self.nn_2, 'ff' : self.ff }
         ).to_csv( filename, sep=' ', mode='a', header=True, index=False ) 
     
     def load( self, filename ) : 
@@ -382,14 +382,14 @@ class Divergence_Compact :
         for _ in range(5) :
             thisline = f.readline().strip().split(' ')
             params[ thisline[0] ] = thisline[1]
-        self.N_A = params['N_A']
-        self.N_B = params['N_B']
+        self.N_1 = params['N_1']
+        self.N_2 = params['N_2']
         self.K = params['K']
         self.Kobs = params['Kobs']
 
         #count hist
         df = pd.read_csv( filename, header=5, sep=' ' )
         assert len(df) == params['size_of_ff']
-        self.nn_A = df['nn_A'].values
-        self.nn_B = df['nn_B'].values
+        self.nn_1 = df['nn_1'].values
+        self.nn_2 = df['nn_2'].values
         self.ff = df['ff'].values
