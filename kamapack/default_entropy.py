@@ -2,18 +2,17 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) October 2021 Francesco Camaglia, LPENS 
-    Following the architecture of J. Hausser and K. Strimmer : https://strimmerlab.github.io/software/entropy/  
+    Copyright (C) January 2022 Francesco Camaglia, LPENS 
+    Following the architecture of J. Hausser and K. Strimmer : 
+    https://strimmerlab.github.io/software/entropy/  
 '''
 
 import numpy as np
 from scipy.special import comb
-
 from . import nsb_entropy
 
 # loagirthm unit
 _unit_Dict_ = { "ln": 1., "log2": 1./np.log(2), "log10": 1./np.log(10) }
-
 
 #################
 #  SWITCHBOARD  #
@@ -28,32 +27,39 @@ def switchboard( compACT, method="naive", unit=None, **kwargs ):
         raise IOError("Unknown unit, please choose amongst ", _unit_Dict_.keys( ) )
 
     # choosing entropy estimation method
-    if method == "naive":                       # Naive
+    if method in ["naive", "maximum-likelihood"] :    
         shannon_estimate = Naive( compACT )
         
-    elif method == "NSB":                       # Nemenman Shafee Bialek
+    elif method in ["NSB", "Nemenman-Shafee-Bialek"]:   
         shannon_estimate = nsb_entropy.NemenmanShafeeBialek( compACT, **kwargs )
         
-    elif method == "MM":                        # Miller Madow
+    elif method in ["MM", "Miller-Madow"]:  
         shannon_estimate = MillerMadow( compACT )
         
-    elif method == "CS":                        # Chao Shen       
+    elif method in ["CS", "Chao-Shen"] :        
         shannon_estimate = ChaoShen( compACT )
+ 
+    elif method in ["D", "Dirichlet"] :
+        if "a" not in kwargs :
+            raise IOError("The Dirichlet parameter `a` must be specified.")
+        a = kwargs['a']
+        shannon_estimate = Dirichlet( compACT, a )       
         
-    elif method == "Jeffreys":                  # Jeffreys
-        a = 0.5
-        shannon_estimate = Dirichlet( compACT, a )
-        
-    elif method == "Laplace":                   # Laplace
+    elif method in ["L", "Laplace", "Bayesian-Laplace"] :
         a = 1.
         shannon_estimate = Dirichlet( compACT, a )
-        
-    elif method == "SG":                        # Schurmann-Grassberger
+
+    elif method in ["Jeffreys", "Krichevsky-Trofimov"] :
+        a = 0.5
+        shannon_estimate = Dirichlet( compACT, a )
+
+    elif method in ["SG", "Schurmann-Grassberger"]:
         a = 1. / compACT.Kobs
         shannon_estimate = Dirichlet( compACT, a )
         
-    elif method == "minimax":                   # minimax
-        a = np.sqrt( compACT.N ) / compACT.Kobs
+    elif method in ["minimax", "Trybula"]:
+        # FIXME: warning
+        a = np.sqrt( compACT.N ) / compACT.K
         shannon_estimate = Dirichlet( compACT, a )
 
     else:
@@ -62,17 +68,12 @@ def switchboard( compACT, method="naive", unit=None, **kwargs ):
     return unit_conv * shannon_estimate
 ###
 
-
-
-##################################
-#  MAXIMUM LIKELIHOOD ESTIMATOR  #
-##################################
+#####################
+#  NAIVE ESTIMATOR  #
+#####################
 
 def Naive( compACT ):
-    '''
-    Maximum likelihood estimator.
-    WARNING!: TO BE CHECKED
-    '''
+    '''Entropy estimation (naive).'''
 
     # loading parameters from compACT 
     N, nn, ff = compACT.N, compACT.nn, compACT.ff
@@ -83,17 +84,12 @@ def Naive( compACT ):
     return np.array( output )
 ###
 
-
-
 ############################
 #  MILLER MADOW ESTIMATOR  #
 ############################
 
 def MillerMadow( compACT ): 
-    '''
-    Miller-Madow estimator.
-    WARNING!: TO BE CHECKED
-    '''
+    '''Entropy estimation with Miller-Madow pseudocount model.'''
     
     # loading parameters from compACT 
     N, Kobs = compACT.N, compACT.Kobs
@@ -102,22 +98,16 @@ def MillerMadow( compACT ):
     return np.array( output )
 ###
 
-
-
 #########################
 #  CHAO SHEN ESTIMATOR  #
 #########################
 
 def ChaoShen( compACT ):
-    '''
-    Compute Chao-Shen (2003) entropy estimator 
-    WARNING!: TO BE CHECKED
-    '''
+    '''Entropy estimation with Chao-Shen pseudocount model.'''
 
     def __coverage( nn, ff ) :
-        '''
-        Good-Turing frequency estimation with Zhang-Huang formulation
-        '''
+        '''Good-Turing frequency estimation with Zhang-Huang formulation.'''
+
         N = np.dot( nn, ff )
         # Check for the pathological case of all singletons (to avoid coverage = 0)
         # i.e. nn = [1], which means ff = [N]
@@ -137,42 +127,34 @@ def ChaoShen( compACT ):
     if 0 in nn : nn, ff = nn[1:], ff[1:]        
 
     C = __coverage( nn, ff )                            
-    p_vec = C * nn / N                                # coverage adjusted empirical frequencies
+    p_vec = C * nn / N                                  # coverage adjusted empirical frequencies
     lambda_vec = 1. - np.power( 1. - p_vec, N )         # probability to see a bin (specie) in the sample
 
     output = - np.dot( ff , p_vec * np.log( p_vec ) / lambda_vec )
     return np.array( output )
 ###
 
-
-
 ##########################
 #  DIRICHELET ESTIMATOR  #
 ##########################
 
 def Dirichlet( compACT, a ):
-    '''
-    Estimate entropy based on Dirichlet-multinomial pseudocount model.
+    '''Entropy estimation with Dirichlet-multinomial pseudocount model.
 
     Parameters
     ----------  
+
     a: float
-        Pseudocount per bin  (Dirichlet parameter)
-        (e.g.)
-        a=1          :   Laplace
-        a=1/2        :   Jeffreys
-        a=1/M        :   Schurmann-Grassberger  (M: number of bins)
-        a=sqrt(N)/M  :   minimax
+        Dirichlet parameter
     '''
 
     # loading parameters from compACT 
-    N, nn, ff = compACT.N, compACT.nn, compACT.ff
-
-    nn_a = nn + a                                       # counts plus pseudocounts
-    N_a = N + a * np.sum( ff )                          # total number of counts plus pseudocounts
-    hh_a = nn_A / N_a                                   # frequencies
+    N, K = compACT.N, compACT.K
+    nn, ff = compACT.nn, compACT.ff
+    
+    # frequencies with pseudocounts
+    hh_a = (nn + a) / (N + K * a)      
     
     output = - np.dot( ff , hh_a * np.log( hh_a ) )
     return np.array( output )
 ###
-

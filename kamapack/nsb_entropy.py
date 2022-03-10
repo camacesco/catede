@@ -12,7 +12,7 @@ from scipy import optimize
 import multiprocessing
 import tqdm
 
-from ._nsb_aux_definitions import *
+from ._aux_definitions import *
 
 def NemenmanShafeeBialek( compACTexp, error=False, bins=1e4, CPU_Count=None, progressbar=False ):
     '''
@@ -46,13 +46,13 @@ def NemenmanShafeeBialek( compACTexp, error=False, bins=1e4, CPU_Count=None, pro
     # multiprocessing (WARNING:)
     POOL = multiprocessing.Pool( CPU_Count )   
     
-    S_vec = np.linspace(0, np.log(K), n_bins)[1:-1]
-    args = [ (implicit_S_vs_Alpha, S, 0, 1e15, K) for S in S_vec ]
-    Alpha_vec = POOL.starmap( get_from_implicit, tqdm.tqdm(args, total=len(args), 
+    A_vec = np.linspace(0, np.log(K), n_bins)[1:-1]
+    args = [ (implicit_entropy_vs_alpha, A, 0, 1e15, K) for A in A_vec ]
+    alpha_vec = POOL.starmap( get_from_implicit, tqdm.tqdm(args, total=len(args), 
                                                            desc="Pre-computation 1/2", disable=disable) )
-    Alpha_vec = np.asarray( Alpha_vec )
+    alpha_vec = np.asarray( alpha_vec )
     
-    args = [ (a, compACTexp ) for a in Alpha_vec ]
+    args = [ ( alpha, compACTexp ) for alpha in alpha_vec ]
     measures = POOL.starmap( measureMu, tqdm.tqdm(args, total=len(args), desc='Pre-computations 2/2', disable=disable) )
     mu_a = np.asarray( measures )  
         
@@ -60,7 +60,6 @@ def NemenmanShafeeBialek( compACTexp, error=False, bins=1e4, CPU_Count=None, pro
     #  estimators vs alpha  #
     # >>>>>>>>>>>>>>>>>>>>>>>
     
-    args = [ ( alpha, compACTexp ) for alpha in Alpha_vec ]
     all_S1_a = POOL.starmap( estimate_S_at_alpha, tqdm.tqdm(args, total=len(args), desc="Estimator Eval", disable=disable) )
     all_S1_a = np.asarray(all_S1_a)
     
@@ -78,16 +77,16 @@ def NemenmanShafeeBialek( compACTexp, error=False, bins=1e4, CPU_Count=None, pro
     # NOTE: the normalization integral is computed on the same bins 
     #       which simplifies the bin size 
     
-    Zeta = integral_with_mu( mu_a, 1, S_vec )
+    Zeta = integral_with_mu( mu_a, 1, A_vec )
 
-    integral_S1 = integral_with_mu(mu_a, all_S1_a, S_vec)
+    integral_S1 = integral_with_mu(mu_a, all_S1_a, A_vec)
     S1 = mp.fdiv(integral_S1, Zeta)     
 
     if error is False :       
         shannon_estimate = np.array(S1, dtype=np.float) 
         
     else :
-        S2 = mp.fdiv(integral_with_mu(mu_a, all_S2_a, S_vec), Zeta)
+        S2 = mp.fdiv(integral_with_mu(mu_a, all_S2_a, A_vec), Zeta)
         S_devStd = np.sqrt(S2 - np.power(S1, 2))
         shannon_estimate = np.array([S1, S_devStd], dtype=np.float)   
         
@@ -108,7 +107,7 @@ def estimate_S_at_alpha( a, compACTexp ):
     N, nn, ff, K = compACTexp.N, compACTexp.nn, compACTexp.ff, compACTexp.K
     
     # entropy computation
-    temp = ff.dot( (nn+a) * D_polyGmm(0, N+K*a+1, nn+a+1) )     
+    temp = ff.dot( (nn+a) * D_diGmm(N+K*a+1, nn+a+1) )     
     S1_a = mp.fdiv( temp, N+K*a )
 
     return S1_a
@@ -121,11 +120,11 @@ def estimate_S2_at_alpha( a, compACTexp ) :
     N, nn, ff, K = compACTexp.N, compACTexp.nn, compACTexp.ff, compACTexp.K
     
     # single sum term
-    single_sum = np.power(D_polyGmm(0, nn+a+2, N+K*a+2), 2) + D_polyGmm(1, nn+a+2, N+K*a+2)
+    single_sum = np.power(D_diGmm(nn+a+2, N+K*a+2), 2) + D_triGmm(nn+a+2, N+K*a+2)
     Ss = (nn+a+1) * (nn+a) * single_sum
     
     # double sum term 
-    double_sum = D_polyGmm(0, nn+a+1, N+K*a+2)[:,None] * D_polyGmm(0, nn+a+1, N+K*a+2) - polygamma(1, N+K*a+2)
+    double_sum = D_diGmm(nn+a+1, N+K*a+2)[:,None] * D_diGmm(nn+a+1, N+K*a+2) - triGmm(N+K*a+2)
     Ds = ( (nn+a)[:,None] * (nn+a) ) * double_sum
             
     output = ff.dot( Ss - Ds.diagonal() + Ds.dot(ff) )
