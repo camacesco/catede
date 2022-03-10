@@ -35,7 +35,7 @@ def Kullback_Leibler_CMW_eqdiv( compACTdiv, n_bins=5e2, cutoff_ratio=5, error=Fa
     D_vec = np.logspace(0, np.log10( D_cutoff + 1 ), n_bins+2) - 1
     D_vec = D_vec[1:-1]
     
-    Alpha_vec = ( 1. - 1./K ) / D_vec
+    alpha_vec = ( 1. - 1./K ) / D_vec
     
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     #  Compute MeasureMu Alpha and Beta #
@@ -44,8 +44,8 @@ def Kullback_Leibler_CMW_eqdiv( compACTdiv, n_bins=5e2, cutoff_ratio=5, error=Fa
     # multiprocessing (WARNING:)
     POOL = multiprocessing.Pool( CPU_Count )  
     
-    args = [ (a, compACTdiv.compact_1 ) for a in Alpha_vec ]
-    args = args + [ (a, compACTdiv.compact_2 ) for a in Alpha_vec ]
+    args = [ (a, compACTdiv.compact_1 ) for a in alpha_vec ]
+    args = args + [ (a, compACTdiv.compact_2 ) for a in alpha_vec ]
     
     measures = POOL.starmap( measureMu, tqdm.tqdm(args, total=len(args), desc='Pre-computations', disable=disable) )
     measures = np.asarray( measures )  
@@ -71,7 +71,7 @@ def Kullback_Leibler_CMW_eqdiv( compACTdiv, n_bins=5e2, cutoff_ratio=5, error=Fa
     #  DKL estimator vs alpha  #
     # >>>>>>>>>>>>>>>>>>>>>>>>>>
         
-    args = [ x + (compACTdiv,) for x in zip(Alpha_vec, Alpha_vec) ]
+    args = [ x + (compACTdiv,) for x in zip(alpha_vec, alpha_vec) ]
     all_DKL_a = POOL.starmap( estimate_DKL_at_alpha_beta, tqdm.tqdm(args, total=len(args), 
                                                                      desc='Evaluations', disable=disable) )
     all_DKL_a = np.asarray( all_DKL_a )
