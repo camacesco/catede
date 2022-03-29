@@ -14,6 +14,7 @@ from scipy import optimize
 ##############
 #  NOTATION  #
 ##############
+
 def diGmm(x) :    
     '''Digamma function (polygamma of order 0).'''
     return polygamma(0, x)
@@ -34,21 +35,60 @@ def LogGmm( x ):
     ''' alias '''
     return loggamma( x ).real    
 
+################
+#  POSTERIORS  #
+################
+
 def measureMu( alpha, compACT ) :
-    '''
-    Measure Mu term in the posterior estimators computed as the exponent of an exponential.
-    '''
+    '''Measure Mu term in the posterior estimators'''
         
-    # loading parameters from compACT        
-    N, nn, ff, K = compACT.N, compACT.nn, compACT.ff, compACT.K
-    
+
     # mu computation  :  
     # Dirichelet prior normalization contribution
-    LogMu = LogGmm( K*alpha ) - K * LogGmm( alpha )                  
-    # posterior contribution 
-    LogMu += ff.dot( LogGmm(nn+alpha) ) - LogGmm( N + K*alpha )       
+      
 
-    return mp.exp( LogMu )
+    return mp.exp( LogMu(alpha, compACT) )
+
+def LogMu( alpha, compACTexp ) :
+    '''logarithm computation of Measure Mu term.'''
+    N, K = compACTexp.N,  compACTexp.K
+    nn, ff = compACTexp.nn, compACTexp.ff
+
+    # log(mu) computation  :  
+    # Dirichelet prior normalization contribution
+    output = LogGmm( K*alpha ) - K * LogGmm( alpha )                  
+    # posterior contribution 
+    output += ff.dot( LogGmm(nn+alpha) ) - LogGmm( N + K*alpha ) 
+    return output
+
+def optimal_dirichlet_param( compACTexp, upper=1e-4, lower=1e2 ) :
+    '''Return Dirchlet parameter which optimizes entropy posterior (~).''' 
+
+    def implicit_relation( x, y, compACTexp ):
+        N, K = compACTexp.N,  compACTexp.K
+        nn, ff = compACTexp.nn, compACTexp.ff
+
+        tmp = K * diGmm(N+K*x) - K * diGmm(K*x) + K * diGmm(x) - ff.dot(diGmm(nn+x))
+        return tmp - y
+
+    output = get_from_implicit(implicit_relation, 0, upper, lower, compACTexp )
+    return output
+
+def optimal_ed_param( compACTdiv, upper=1e-4, lower=1e2 ) :
+    '''Return Dirchlet parameter which optimizes divergence posterior alpha=beta (~).''' 
+
+    def implicit_relation( x, y, compACTdiv ):
+        N_1, N_2, K  = compACTdiv.N_1, compACTdiv.N_2, compACTdiv.K
+        nn_1, nn_2, ff = compACTdiv.nn_1, compACTdiv.nn_2, compACTdiv.ff
+
+        tmp = K * diGmm(N_1+K*x) - K * diGmm(K*x) + K * diGmm(x) - ff.dot(diGmm(nn_1+x))
+        tmp += K * diGmm(N_2+K*x) - K * diGmm(K*x) + K * diGmm(x) - ff.dot(diGmm(nn_2+x))
+
+        return tmp - y
+
+    output = get_from_implicit(implicit_relation, 0, upper, lower, compACTdiv )
+    return output
+
 
 def integral_with_mu( mu, func, x ) :
     ''' alias '''   
@@ -82,5 +122,15 @@ def implicit_crossentropy_vs_beta( beta, crossentropy, K ):
     implicit relation to be inverted.
     '''
     return D_diGmm( K * beta , beta ) - crossentropy
+
+
+############
+#  others  #
+############
+
+def number_of_coincidences( compACTexp ) :
+    '''Number of coincidences in the experiment.'''
+    output = compACTexp.N - np.sum(compACTexp.ff[compACTexp.nn == 1])
+    return output
 
     

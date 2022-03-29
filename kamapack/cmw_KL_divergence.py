@@ -15,7 +15,7 @@ import itertools
 import tqdm
 from ._aux_definitions import *
 
-def Kullback_Leibler_CMW( compACTdiv, n_bins=5e2, cutoff_ratio=4, error=False, CPU_Count=None, verbose=False, equal_diversity=False, prior="unif" ):
+def Kullback_Leibler_CMW( compACTdiv, n_bins=5e2, cutoff_ratio=4, error=False, CPU_Count=None, verbose=False, equal_diversity=False ):
     '''Kullback-Leibler divergence estimation with Camaglia Mora Walczak method.
     '''
     # >>>>>>>>>>>>>>>>>>>>>>
@@ -30,15 +30,14 @@ def Kullback_Leibler_CMW( compACTdiv, n_bins=5e2, cutoff_ratio=4, error=False, C
     try :
         cutoff_ratio = float( cutoff_ratio )
         if cutoff_ratio < 1. :
-            warnings.warn("The parameter `cutoff_ratio` must be >=1.")
-            cutoff_ratio = 1.
+            if cutoff_ratio > 0. :
+                warnings.warn("The parameter `cutoff_ratio` should be >=1.")
+            else :
+                raise IOError("The parameter `cutoff_ratio` must be >=1.")
+
     except :
         raise TypeError("The parameter `cutoff_ratio` requires a scalar value.")
 
-    list_of_priors = ["unif", "log-unif", "linear", "ilya", "NSB"]
-    if not prior in list_of_priors :
-        raise IOError( "The parameter `prior` must be one amongst : ", list_of_priors )
-        
     try :
         CPU_Count = int(CPU_Count)
         if CPU_Count < 1 :
@@ -48,7 +47,7 @@ def Kullback_Leibler_CMW( compACTdiv, n_bins=5e2, cutoff_ratio=4, error=False, C
 
     if equal_diversity is True : # alpha = beta
         from ._cmw_KL_eqdiv_divergence import Kullback_Leibler_CMW_eqdiv
-        return Kullback_Leibler_CMW_eqdiv( compACTdiv, n_bins=n_bins, cutoff_ratio=cutoff_ratio, error=error, CPU_Count=CPU_Count, prior=prior, verbose=verbose )
+        return Kullback_Leibler_CMW_eqdiv( compACTdiv, n_bins=n_bins, cutoff_ratio=cutoff_ratio, error=error, CPU_Count=CPU_Count, verbose=verbose )
 
     else : # standard alpha != beta
 
@@ -69,9 +68,11 @@ def Kullback_Leibler_CMW( compACTdiv, n_bins=5e2, cutoff_ratio=4, error=False, C
         B_cutoff = ( cutoff_ratio + 1 ) * np.log(K)
         B_vec = np.linspace(np.log(K), B_cutoff, n_bins+2)[1:-1]
         '''
+
         A_vec = np.logspace( 0, np.log10( np.log(K) + 1 ), n_bins+2 ) - 1 
         A_vec = A_vec[1:-1]
-        B_cutoff = ( cutoff_ratio + 1 ) * np.log(K)
+        #B_cutoff = ( cutoff_ratio + 1 ) * np.log(K)
+        B_cutoff = np.max([10, ( cutoff_ratio + 1 )]) * np.log(K) 
         B_vec = np.logspace( np.log10( np.log(K) ), np.log10(B_cutoff) , n_bins+2 )
         B_vec = B_vec[1:-1]
 
@@ -104,7 +105,7 @@ def Kullback_Leibler_CMW( compACTdiv, n_bins=5e2, cutoff_ratio=4, error=False, C
         #  Compute Phi   #
         # >>>>>>>>>>>>>>>>
             
-        args = [ x + (compACTdiv.K, cutoff_ratio, prior,) for x in itertools.product(A_vec, B_vec)]
+        args = [ x + (compACTdiv.K, cutoff_ratio,) for x in itertools.product(A_vec, B_vec)]
                 
         all_phi = POOL.starmap( Phi, tqdm.tqdm(args, total=len(args), 
                                                 desc='Pre-computations 3/3', disable=disable) )
@@ -165,30 +166,18 @@ def Kullback_Leibler_CMW( compACTdiv, n_bins=5e2, cutoff_ratio=4, error=False, C
 #  PHI  #
 #########
 
-def Phi( A, B, K, cutoff_ratio, prior ) :
+def Phi( A, B, K, cutoff_ratio ) :
     '''Mixture of Prior Kernel (?)'''
 
     D = B - A
 
     # choice of the prior
-    if prior == "unif" :
-        rho_D = 1.
-    elif prior == "log-unif" :
-        rho_D = 1. / D 
-    elif prior == "linear" :
-        rho_D = D 
-    else :
-        rho_D = 1.
-        pass
+    rho_D = 1. # uniform
 
     # function by cases 
-    if D >= cutoff_ratio * np.log(K) :
+    if D >= cutoff_ratio * np.log(K) : # cutoff
         return 0.
-    elif prior == "ilya" :
-        return np.exp( - B / A )
-    elif prior == "NSB" :
-        return 1.
-    elif D >= np.log(K) :
+    elif D >= np.log(K) : # uniform
         return rho_D / np.log(K)
     else :
         return rho_D / D 

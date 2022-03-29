@@ -9,8 +9,9 @@
 
 import numpy as np 
 from .cmw_KL_divergence import Kullback_Leibler_CMW
-# loagirthm unit
-_unit_Dict_ = { "ln": 1., "log2": 1./np.log(2), "log10": 1./np.log(10) }
+from ._aux_definitions import optimal_dirichlet_param
+from ._aux_shannon import _unit_Dict_
+
 _method_List_ = ["naive", "CMW", "Jeffreys", "Laplace", "minimax", "SG"]
 _which_List_ = ["Jensen-Shannon", "Kullback-Leibler"]
 
@@ -118,6 +119,26 @@ def Dirichlet( compACT, a, b, which="Kullback-Leibler", ):
     N_1, N_2, K = compACT.N_1, compACT.N_2, compACT.K
     # delete 0 counts
     nn_1, nn_2, ff = compACT.nn_1, compACT.nn_2, compACT.ff
+
+    if a == "optimal" :
+        a = optimal_dirichlet_param(compACT.compact_1)
+    else :
+        try:
+            a = np.float64(a)
+        except :
+            raise IOError('The Dirichlet parameter must be a scalar.')
+        if a < 0 :
+            raise IOError('The Dirichlet parameter must greater than 0.')
+
+    if b == "optimal" :
+        b = optimal_dirichlet_param(compACT.compact_2)
+    else :
+        try:
+            b = np.float64(b)
+        except :
+            raise IOError('The Dirichlet parameter must be a scalar.')
+        if b < 0 :
+            raise IOError('The Dirichlet parameter must greater than 0.')
 
     hh_1_a = ( nn_1 + a ) / ( N_1 + K*a )     # frequencies with pseudocounts
     hh_2_b = ( nn_2 + b ) / ( N_2 + K*b )     # frequencies with pseudocounts
