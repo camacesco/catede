@@ -10,9 +10,8 @@
 import numpy as np
 from scipy.special import comb
 from . import nsb_entropy
-
-# loagirthm unit
-_unit_Dict_ = { "ln": 1., "log2": 1./np.log(2), "log10": 1./np.log(10) }
+from ._aux_definitions import optimal_dirichlet_param
+from ._aux_shannon import _unit_Dict_
 
 #################
 #  SWITCHBOARD  #
@@ -151,7 +150,17 @@ def Dirichlet( compACT, a ):
     # loading parameters from compACT 
     N, K = compACT.N, compACT.K
     nn, ff = compACT.nn, compACT.ff
-    
+
+    if a == "optimal" :
+        a = optimal_dirichlet_param(compACT)
+    else :
+        try:
+            a = np.float64(a)
+        except :
+            raise IOError('The Dirichlet parameter must be a scalar.')
+        if a < 0 :
+            raise IOError('The Dirichlet parameter must greater than 0.')
+
     # frequencies with pseudocounts
     hh_a = (nn + a) / (N + K * a)      
     

@@ -15,7 +15,7 @@ import tqdm
 from ._aux_definitions import *
 from .cmw_KL_divergence import estimate_DKL_at_alpha_beta, estimate_DKL2_at_alpha_beta
 
-def Kullback_Leibler_CMW_eqdiv( compACTdiv, n_bins=5e2, cutoff_ratio=5, error=False, CPU_Count=None, prior="unif", verbose=False ):
+def Kullback_Leibler_CMW_eqdiv( compACTdiv, n_bins=5e2, cutoff_ratio=5, error=False, CPU_Count=None, verbose=False ):
     '''Kullback-Leibler divergence estimation with CMW method in the case of equal diversity assumption.
     '''
 
@@ -56,16 +56,6 @@ def Kullback_Leibler_CMW_eqdiv( compACTdiv, n_bins=5e2, cutoff_ratio=5, error=Fa
     # regualarization 
     mu_alpha_1 /= np.max( mu_alpha_1 )
     mu_alpha_2 /= np.max( mu_alpha_2 )
-
-    # prior choice
-    if prior == "unif" :
-        pass
-    elif prior == "log-unif" :
-        mu_alpha_2 = mu_alpha_2 / D_vec
-    elif prior == "linear" :
-        mu_alpha_2 = mu_alpha_2 * D_vec
-    else :
-        pass
                     
     # >>>>>>>>>>>>>>>>>>>>>>>>>>
     #  DKL estimator vs alpha  #

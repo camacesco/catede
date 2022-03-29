@@ -9,63 +9,19 @@ import warnings
 import numpy as np
 import pandas as pd
 from . import default_entropy, default_divergence
+from ._aux_shannon import Skeleton_Class, experiment_rank_plot, divergence_rank_plot
 
-class _skeleton_ :
+# FIXME : this approach is not optimal
+import joblib
+def load_class( filename ) :
+    '''Load Experiment/Divergence objected saved at `filename`.'''
+    return joblib.load( filename )
 
-    '''
-    update_categories( categories )
-        Change the number of categories.
-    show
-        Print a short summary.
-    '''
-
-    def update_categories( self, categories ):
-        '''Change the number of categories.
-
-        Parameters
-        ----------        
-        categories : scalar
-                The new number of categories of the system (int or float). 
-                If the value is lower than the observed number of categories, 
-                the observed number is used instead.'''
-
-        if categories is None:
-            self.usr_n_categ = self.obs_n_categ    
-        else :
-            try : 
-                categories = int( categories )
-            except :        
-                raise TypeError("The parameter `categories` must be an integer.")
-            if categories > self.obs_n_categ :
-                self.usr_n_categ = categories
-            else :
-                self.usr_n_categ = self.obs_n_categ  
-                if categories < self.obs_n_categ :
-                    warnings.warn("The parameter `categories` is set equal to the observed number of categories.")
-    
-    def show( self ):
-        '''Print a short summary.'''
-        
-        print("Total number of counts:")
-        if type(self.tot_counts) == pd.Series :
-            print(self.tot_counts.to_string())
-        else :
-            print(self.tot_counts)
-            
-        print("N. of Categories:")
-        print(self.obs_n_categ, ' (observed)')
-        print(self.usr_n_categ, ' (a priori)')
-        
-        print("Recurrencies:")
-        print(self.counts_hist)
-
-        
 ######################
 #  EXPERIMENT CLASS  #
 ######################
 
-class Experiment( _skeleton_ ) :
-
+class Experiment( Skeleton_Class ) :
     '''The basic class for estimating entropy from dataset distribution.
     
     Methods
@@ -73,7 +29,7 @@ class Experiment( _skeleton_ ) :
     entropy( method="naive", unit="ln", **kwargs )
         Estimate Shannon entropy.'''
 
-    __doc__ += _skeleton_.__doc__
+    __doc__ += Skeleton_Class.__doc__
     
     def __init__( self, data, categories=None, iscount=False ):
         '''
@@ -161,7 +117,11 @@ class Experiment( _skeleton_ ) :
     def compact( self ) :
         '''It provides aliases for computations.'''
         return Experiment_Compact( experiment=self )
-    
+
+    def rank_plot( self, figsize=(3,3), color="#ff0054", xlabel="rank", ylabel="frequency", grid=True, logscale=True) :
+        '''Rank plot.'''
+        return experiment_rank_plot( self, figsize=figsize, color=color, xlabel=xlabel, ylabel=ylabel, logscale=logscale, grid=grid)
+     
     def save_compact( self, filename ) :
         '''It saves the compact features of Experiment to `filename`.'''
         self.compact( ).save( filename )
@@ -192,8 +152,7 @@ class Experiment_Compact :
         
         # counts hist
         pd.DataFrame(
-            { 'nn' : self.nn,
-             'ff' : self.ff }
+            { 'nn' : self.nn, 'ff' : self.ff }
         ).to_csv( filename, sep=' ', mode='a', header=True, index=False )        
 
     def load( self, filename ) : 
@@ -220,7 +179,7 @@ class Experiment_Compact :
 ######################
 
 
-class Divergence( _skeleton_ ) :
+class Divergence( Skeleton_Class ) :
     
     '''The basic class for estimating divergence between two dataset distributions.
 
@@ -231,7 +190,7 @@ class Divergence( _skeleton_ ) :
     kullback_leibler( method="naive", unit="ln", **kwargs )
         Estimate Kullback-Leibler divergence.'''
 
-    __doc__ += _skeleton_.__doc__
+    __doc__ += Skeleton_Class.__doc__
 
     def __init__( self, my_exp_1, my_exp_2 ) :
         '''
@@ -325,12 +284,16 @@ class Divergence( _skeleton_ ) :
         
         return default_divergence.switchboard( self.compact(), method=method, which="Jensen-Shannon", unit=unit, **kwargs )
 
+    def rank_plot( self, figsize=(3,3), color1="#ff0054", color2="#0088ff", xlabel="rank", ylabel="frequency", logscale=True, grid=True, by_first=True) :
+        '''Rank plot.'''
+        return divergence_rank_plot( self, figsize=figsize, color1=color1, color2=color2, xlabel=xlabel, ylabel=ylabel, logscale=logscale, grid=grid, by_first=by_first )
+
     def compact( self ) :
         '''It provides aliases for computations.'''
         return Divergence_Compact( self )
         
     def save_compact( self, filename ) :
-        '''It saves the count hist features of Experiment to `filename`.'''
+        '''It saves the compact version of Experiment to `filename`.'''
         self.compact( ).save( filename )
     
 class Divergence_Compact :
