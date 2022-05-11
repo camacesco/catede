@@ -10,7 +10,7 @@
 import numpy as np
 from scipy.special import comb
 from . import nsb_entropy
-from ._aux_definitions import optimal_dirichlet_param
+from ._wolpert_wolf_calculus import optimal_dirichlet_param_
 from ._aux_shannon import _unit_Dict_
 
 #################
@@ -152,7 +152,7 @@ def Dirichlet( compACT, a ):
     nn, ff = compACT.nn, compACT.ff
 
     if a == "optimal" :
-        a = optimal_dirichlet_param(compACT)
+        a = optimal_dirichlet_param_(compACT)
     else :
         try:
             a = np.float64(a)

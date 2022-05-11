@@ -12,12 +12,12 @@ from scipy import optimize
 import multiprocessing
 import tqdm
 
-from ._aux_definitions import *
+from ._wolpert_wolf_calculus import *
 
-def NemenmanShafeeBialek( compACTexp, error=False, bins=1e4, CPU_Count=None, progressbar=False ):
-    '''
-    NSB entropy estimator description:
-    '''
+def NemenmanShafeeBialek(
+    compACTexp, error=False, n_bins=2.5e1, CPU_Count=None, verbose=False
+    ):
+    ''' Nemenamn-Shafee-Bialekd entropy estimator '''
 
     K = compACTexp.K
     
@@ -26,7 +26,7 @@ def NemenmanShafeeBialek( compACTexp, error=False, bins=1e4, CPU_Count=None, pro
     # >>>>>>>>>>>>>>>>>>>>>>
         
     try :
-        n_bins = int(bins)
+        n_bins = int(n_bins)
     except :
         raise TypeError("The parameter `bins` requires an integer value.")
         
@@ -37,97 +37,60 @@ def NemenmanShafeeBialek( compACTexp, error=False, bins=1e4, CPU_Count=None, pro
     except :
         CPU_Count = multiprocessing.cpu_count()
         
-    disable = not progressbar
+    disable = not verbose
 
     # >>>>>>>>>>>>>>>>>
     #  Compute Alpha  #
     # >>>>>>>>>>>>>>>>>
 
-    # multiprocessing (WARNING:)
+    a_NSB_star = optimal_entropy_param_( compACTexp, upper=1e-5, lower=1e3 )
+    alpha_vec = a_NSB_star * np.append(np.logspace( -0.01, 0, int(n_bins/2) ), np.logspace( 0, 0.01, int(n_bins/2) )[1:] )
+    A_vec = list(map( lambda a : implicit_entropy_vs_alpha_(a, 0, K), alpha_vec ) )
+    
     POOL = multiprocessing.Pool( CPU_Count )   
-    
-    A_vec = np.linspace(0, np.log(K), n_bins)[1:-1]
-    args = [ (implicit_entropy_vs_alpha, A, 0, 1e15, K) for A in A_vec ]
-    alpha_vec = POOL.starmap( get_from_implicit, tqdm.tqdm(args, total=len(args), 
-                                                           desc="Pre-computation 1/2", disable=disable) )
-    alpha_vec = np.asarray( alpha_vec )
-    
-    args = [ ( alpha, compACTexp ) for alpha in alpha_vec ]
-    measures = POOL.starmap( measureMu, tqdm.tqdm(args, total=len(args), desc='Pre-computations 2/2', disable=disable) )
+
+    args = alpha_vec
+    measures = POOL.map(
+        compACTexp._measureMu,
+        tqdm.tqdm(args, total=len(args), desc='Pre-computations 2/2', disable=disable)
+        )
     mu_a = np.asarray( measures )  
         
     # >>>>>>>>>>>>>>>>>>>>>>>
     #  estimators vs alpha  #
     # >>>>>>>>>>>>>>>>>>>>>>>
     
-    all_S1_a = POOL.starmap( estimate_S_at_alpha, tqdm.tqdm(args, total=len(args), desc="Estimator Eval", disable=disable) )
+    args = alpha_vec
+    all_S1_a = POOL.map(
+        compACTexp._post_entropy,
+        tqdm.tqdm(args, total=len(args), desc="Estimator Eval", disable=disable)
+        )
     all_S1_a = np.asarray(all_S1_a)
     
     if error is True :
-        all_S2_a = POOL.starmap( estimate_S2_at_alpha, tqdm.tqdm(args, total=len(args), desc="Error Eval", disable=disable) )
+        args = alpha_vec
+        all_S2_a = POOL.map(
+            compACTexp._post_entropy_squared,
+            tqdm.tqdm(args, total=len(args), desc="Error Eval", disable=disable)
+            )
         all_S2_a = np.asarray(all_S2_a)
     
-    # multiprocessing (WARNING:)    
     POOL.close()
     
     # >>>>>>>>>>>>>>>
     #   estimators  #
     # >>>>>>>>>>>>>>>
-    
-    # NOTE: the normalization integral is computed on the same bins 
-    #       which simplifies the bin size 
-    
-    Zeta = integral_with_mu( mu_a, 1, A_vec )
+        
+    Zeta = integral_with_mu_( mu_a, 1, A_vec )
 
-    integral_S1 = integral_with_mu(mu_a, all_S1_a, A_vec)
+    integral_S1 = integral_with_mu_(mu_a, all_S1_a, A_vec)
     S1 = mp.fdiv(integral_S1, Zeta)     
 
     if error is False :       
         shannon_estimate = np.array(S1, dtype=np.float) 
-        
     else :
-        S2 = mp.fdiv(integral_with_mu(mu_a, all_S2_a, A_vec), Zeta)
+        S2 = mp.fdiv(integral_with_mu_(mu_a, all_S2_a, A_vec), Zeta)
         S_devStd = np.sqrt(S2 - np.power(S1, 2))
         shannon_estimate = np.array([S1, S_devStd], dtype=np.float)   
         
     return shannon_estimate
-
-
-
-######################################
-#  S estimation vs Dirichelet param  #
-######################################
-
-def estimate_S_at_alpha( a, compACTexp ):
-    '''
-    It returns entropy S at the given `a` for `compACTexp`.
-    '''
-    
-    # loading parameters from Experiment Compact        
-    N, nn, ff, K = compACTexp.N, compACTexp.nn, compACTexp.ff, compACTexp.K
-    
-    # entropy computation
-    temp = ff.dot( (nn+a) * D_diGmm(N+K*a+1, nn+a+1) )     
-    S1_a = mp.fdiv( temp, N+K*a )
-
-    return S1_a
-
-def estimate_S2_at_alpha( a, compACTexp ) :
-    '''
-    It returns squared entropy S2 at the given `a` for `compACTexp`.
-    '''
-    # loading parameters from Experiment.compACT exp       
-    N, nn, ff, K = compACTexp.N, compACTexp.nn, compACTexp.ff, compACTexp.K
-    
-    # single sum term
-    single_sum = np.power(D_diGmm(nn+a+2, N+K*a+2), 2) + D_triGmm(nn+a+2, N+K*a+2)
-    Ss = (nn+a+1) * (nn+a) * single_sum
-    
-    # double sum term 
-    double_sum = D_diGmm(nn+a+1, N+K*a+2)[:,None] * D_diGmm(nn+a+1, N+K*a+2) - triGmm(N+K*a+2)
-    Ds = ( (nn+a)[:,None] * (nn+a) ) * double_sum
-            
-    output = ff.dot( Ss - Ds.diagonal() + Ds.dot(ff) )
-    output = mp.fdiv( output, mp.fmul(N+K*a+1, N+K*a) ) 
-    
-    return output

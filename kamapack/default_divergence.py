@@ -9,10 +9,18 @@
 
 import numpy as np 
 from .cmw_KL_divergence import Kullback_Leibler_CMW
-from ._aux_definitions import optimal_dirichlet_param
+from ._wolpert_wolf_calculus import optimal_dirichlet_param_
 from ._aux_shannon import _unit_Dict_
 
-_method_List_ = ["naive", "CMW", "Jeffreys", "Laplace", "minimax", "SG"]
+_method_List_ = [
+    "naive", "maximum-likelihood",
+    "CMW",
+    "D", "Dirichlet", 
+    "Jeffreys", "Krichevsky-Trofimov", 
+    "L", "Laplace", 
+    "minimax", "Trybula", 
+    "SG", "Schurmann-Grassberger",
+]
 _which_List_ = ["Jensen-Shannon", "Kullback-Leibler"]
 
 #################
@@ -121,7 +129,7 @@ def Dirichlet( compACT, a, b, which="Kullback-Leibler", ):
     nn_1, nn_2, ff = compACT.nn_1, compACT.nn_2, compACT.ff
 
     if a == "optimal" :
-        a = optimal_dirichlet_param(compACT.compact_1)
+        a = optimal_dirichlet_param_(compACT.compact_1)
     else :
         try:
             a = np.float64(a)
@@ -131,7 +139,7 @@ def Dirichlet( compACT, a, b, which="Kullback-Leibler", ):
             raise IOError('The Dirichlet parameter must greater than 0.')
 
     if b == "optimal" :
-        b = optimal_dirichlet_param(compACT.compact_2)
+        b = optimal_dirichlet_param_(compACT.compact_2)
     else :
         try:
             b = np.float64(b)

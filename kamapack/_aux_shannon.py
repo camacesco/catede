@@ -15,14 +15,10 @@ import matplotlib.pyplot as plt
 
 # unit of the logarithm
 _unit_Dict_ = {
-    "ln": 1., 
-    "n": 1., 
-    "log2": 1./np.log(2),
-    "2": 1./np.log(2),
-    "log10": 1./np.log(10),
-    "10": 1./np.log(10)
+    "n": 1., "ln": 1., 
+    "2": 1./np.log(2), "log2": 1./np.log(2),
+    "10": 1./np.log(10), "log10": 1./np.log(10),
 }
-
 
 class Skeleton_Class :
 
@@ -83,6 +79,60 @@ class Skeleton_Class :
             except OSError as error: 
                 print(error)
         joblib.dump( self, filename )
+
+
+################
+#  SUMMATIONS  #
+################
+
+def ffsum_( ff, sumList ) :
+    ''' Summing methods for histograms of counts.'''
+
+    if type(sumList) is not list : # FIXME :
+        '''
+            sumList = "parallel" (i)
+        '''    
+        output = ff.dot( sumList )
+
+    elif len(sumList) == 2 :
+        '''
+            sumList[0] = "parallel" (i==j)
+            sumList[1] = "perpendic" (i!=j)
+        '''
+
+        # parallel, perpendic diagonal terms
+        tmp1d = sumList[0] - sumList[1].diagonal() 
+        # sum over j perpendic
+        tmp1d += sumList[1].dot(ff)
+        # sum over i
+        output = ff.dot( tmp1d )
+
+    elif len(sumList) == 5 :
+        '''
+            sumList[0] = "parallel" (i==j==k)
+            sumList[1] = "cross_1" (i!=j, j==k)
+            sumList[2] = "cross_2" (i==k, j!=k)
+            sumList[3] = "cross_3" (i==j, j!=k)
+            sumList[4] = "perpendic" (i!=j, j!=k, i!=k)
+        '''
+        idx = np.arange(len(ff))
+
+        # cross terms
+        tmp2d = sumList[1] + sumList[2] + sumList[3] 
+        # perpendic minor diagonal terms
+        tmp2d -= sumList[4][:,idx,idx] + sumList[4][idx,:,idx] + sumList[4][idx,idx,:]
+
+        # parallel, matricial diagonal, perpendic main diagonal terms
+        tmp1d = sumList[0] - tmp2d.diagonal() - sumList[4][idx,idx,idx] 
+        # sum over j of all 2d matrices and sum over k of perpendic terms
+        tmp1d += (tmp2d + sumList[4].dot(ff)).dot(ff)
+        # sum over i
+        output = ff.dot( tmp1d )
+    
+    else :
+        raise IOError("FIXME: Developer Error in `ffsum`.")
+
+    return output
         
 
 # >>>>>>>>>>>>
@@ -139,5 +189,3 @@ def divergence_rank_plot(
     y2 = sequences_2.values / N_2
     ax.scatter( x, y2, color=color2 )
     return ax
-
-
