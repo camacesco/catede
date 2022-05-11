@@ -62,8 +62,10 @@ def Kullback_Leibler_CMW_eqdiv( compACTdiv, n_bins=5e2, cutoff_ratio=5, error=Fa
     # >>>>>>>>>>>>>>>>>>>>>>>>>>
         
     args = [ x + (compACTdiv,) for x in zip(alpha_vec, alpha_vec) ]
-    all_DKL_a = POOL.starmap( estimate_DKL_at_alpha_beta, tqdm.tqdm(args, total=len(args), 
-                                                                     desc='Evaluations', disable=disable) )
+    all_DKL_a = POOL.starmap(
+        estimate_DKL_at_alpha_beta,
+        tqdm.tqdm(args, total=len(args), desc='Evaluations', disable=disable)
+        )
     all_DKL_a = np.asarray( all_DKL_a )
     
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -71,8 +73,10 @@ def Kullback_Leibler_CMW_eqdiv( compACTdiv, n_bins=5e2, cutoff_ratio=5, error=Fa
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>
         
     if error is True :
-        all_DKL2_a = POOL.starmap( estimate_DKL2_at_alpha_beta, tqdm.tqdm(args, total=len(args), 
-                                                                         desc='Error evaluations', disable=disable) )
+        all_DKL2_a = POOL.starmap(
+            estimate_DKL2_at_alpha_beta,
+            tqdm.tqdm(args, total=len(args), desc='Error evaluations', disable=disable)
+            )
         all_DKL2_a = np.asarray( all_DKL2_a )
     
     POOL.close()

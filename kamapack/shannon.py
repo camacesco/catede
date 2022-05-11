@@ -9,10 +9,10 @@ import warnings
 import numpy as np
 import pandas as pd
 from . import default_entropy, default_divergence
-from ._aux_shannon import Skeleton_Class, experiment_rank_plot, divergence_rank_plot
+from ._aux_shannon import *
+from ._wolpert_wolf_calculus import *
 
-# FIXME : this approach is not optimal
-import joblib
+import joblib # FIXME : this approach is not optimal
 def load_class( filename ) :
     '''Load Experiment/Divergence objected saved at `filename`.'''
     return joblib.load( filename )
@@ -77,7 +77,8 @@ class Experiment( Skeleton_Class ) :
         self.obs_n_categ = len( data_hist ) # observed categories
         temp = pd.Series( data_hist.values ).astype(int)
         self.counts_hist = temp.groupby( temp ).size()  
-        
+        self.counts_hist.name = "freq"
+
         #  Load categories  #
         self.update_categories( categories )
         if self.usr_n_categ > self.obs_n_categ :
@@ -174,10 +175,36 @@ class Experiment_Compact :
         self.nn = df['nn'].values
         self.ff = df['ff'].values
 
+    def _measureMu( self,  a ) :
+        '''Practical alias for the measure mu.'''
+        return measureMu_( self,  a )
+
+    def _Omega( self, shift, a) :
+        '''Practical alias for Wolpert-Wolf function Omega.'''
+        return Omega_( self, shift, a)
+
+    def _Lambda( self, order, shift, a) :
+        '''Practical alias for Wolpert-Wolf function Lambda.'''
+        return Lambda_( self, order, shift, a)
+
+    def _der_Lambda( self, order, shift, deriv, a) :
+        '''Practical alias for Wolpert-Wolf derivative of function Lambda.'''
+        return der_Lambda_( self, order, shift, deriv, a)
+
+    def _ffsum( self, sumList ) :
+        return ffsum_( self.ff, sumList )
+
+    def _post_entropy( self, a ) :
+        '''Practical alias for Posterior Multinomial-Dirichlet entropy estimator.'''
+        return post_entropy_( self, a )
+
+    def _post_entropy_squared( self, a ) :
+        '''Practical alias for Posterior Multinomial-Dirichlet sqaured entropy estimator.'''
+        return post_entropy_squared_( self, a )
+
 ######################
 #  DIVERGENCE CLASS  #
 ######################
-
 
 class Divergence( Skeleton_Class ) :
     
@@ -204,8 +231,10 @@ class Divergence( Skeleton_Class ) :
 
         # WARNING!: add option to avoid create experiment at first
         
-        self.tot_counts = pd.Series({"Exp-1": my_exp_1.tot_counts,
-                                     "Exp-2": my_exp_2.tot_counts})
+        self.tot_counts = pd.Series(
+            {"Exp-1": my_exp_1.tot_counts,
+            "Exp-2": my_exp_2.tot_counts}
+            )
 
         df = pd.concat( [my_exp_1.data_hist, my_exp_2.data_hist], axis=1 )
         df = df.replace(np.nan, 0).astype(int)
@@ -221,14 +250,21 @@ class Divergence( Skeleton_Class ) :
         if self.usr_n_categ > self.obs_n_categ :
             self.counts_hist[(0,0)] = self.usr_n_categ - self.obs_n_categ
             self.counts_hist = self.counts_hist.sort_index(ascending=True)
-        
+        self.counts_hist.name = "freq"
+
         # WARNING!: is this a deep copy ?
-        
-        self.exp_1 = my_exp_1
+        tmp = self.counts_hist.reset_index(level=[0,1]).copy()
+        # experiment 1 copy
+        self.exp_1 = Experiment( my_exp_1.data_hist )
         self.exp_1.update_categories( self.usr_n_categ )
-        self.exp_2 = my_exp_2
+        counts_1 = tmp[["freq", "Exp-1"]].set_index("Exp-1", drop=True)
+        self.exp_1.counts_hist = counts_1["freq"] # convert to series
+        # experiment 2 copy
+        self.exp_2 = Experiment( my_exp_2.data_hist )
         self.exp_2.update_categories( self.usr_n_categ )
-        
+        counts_2 = tmp[["freq", "Exp-2"]].set_index("Exp-2", drop=True)
+        self.exp_2.counts_hist = counts_2["freq"]
+
     def kullback_leibler( self, method="naive", unit="ln", **kwargs ):
         '''Estimate Kullback-Leibler divergence.
 
@@ -295,6 +331,11 @@ class Divergence( Skeleton_Class ) :
     def save_compact( self, filename ) :
         '''It saves the compact version of Experiment to `filename`.'''
         self.compact( ).save( filename )
+
+
+##############################
+#  DIVERGENCE COMPACT CLASS  #
+##############################
     
 class Divergence_Compact :
     def __init__( self, divergence=None, filename=None ) :
@@ -327,7 +368,7 @@ class Divergence_Compact :
         # parameters
         pd.DataFrame(
             [ self.N_1, self.N_2, self.K, self.Kobs, len(self.ff) ],
-                    index = ['N_1', 'N_2', 'K', 'Kobs', 'size_of_ff']
+            index = ['N_1', 'N_2', 'K', 'Kobs', 'size_of_ff']
         ).to_csv( filename, sep=' ', mode='w', header=False, index=True )
         
         # counts hist
@@ -356,3 +397,12 @@ class Divergence_Compact :
         self.nn_1 = df['nn_1'].values
         self.nn_2 = df['nn_2'].values
         self.ff = df['ff'].values
+
+    def _ffsum( self, sumList ) :
+        return ffsum_( self.ff, sumList )
+
+    def _post_divergence( self, a, b ) :
+        return post_divergence_( self, a, b )
+
+    def _post_divergence_squared( self, a, b ) :
+        return post_divergence_squared_( self, a, b )
