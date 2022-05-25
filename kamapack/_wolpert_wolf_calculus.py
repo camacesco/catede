@@ -73,7 +73,7 @@ def integral_with_mu_( mu, func, x ) :
 #  SADDLE-POINT METHOD #
 # >>>>>>>>>>>>>>>>>>>>>> 
 
-def optimal_dirichlet_param_( compACTexp, upper=1e-4, lower=1e2 ) :
+def optimal_dirichlet_param_( compACTexp, lower=1e-5, upper=1e3 ) :
     '''Return Dirchlet parameter which optimizes entropy posterior (~).''' 
     # FIXME : extreme cases not covered
 
@@ -81,55 +81,113 @@ def optimal_dirichlet_param_( compACTexp, upper=1e-4, lower=1e2 ) :
         N, K = compACTexp.N,  compACTexp.K
         nn = compACTexp.nn
 
-        tmp = K * diGmm(N+K*x) - K * diGmm(K*x) + K * diGmm(x) - compACTexp._ffsum(diGmm(nn+x))
+        tmp = diGmm(N+K*x) - compACTexp._ffsum(diGmm(nn+x)) / K + D_diGmm(x, K*x)
         return tmp - y
 
-    output = get_from_implicit_(implicit_relation, 0, upper, lower, compACTexp )
+    # FIXME : handwavy solution
+    if implicit_relation( lower, 0, compACTexp ) > 0 :
+        y = 1.001 * implicit_relation( lower, 0, compACTexp )
+    elif implicit_relation( upper, 0, compACTexp ) < 0 :
+        y = 1.001 * implicit_relation( upper, 0, compACTexp )
+    else :
+        y = 0
+
+    output = get_from_implicit_(implicit_relation, y, upper, lower, compACTexp )
     return output
 
-def optimal_entropy_param_( compACTexp, upper=1e-4, lower=1e2 ) :
+def optimal_entropy_param_( compACTexp, lower=1e-5, upper=1e3 ) :
     '''Return NSB parameter entropy posterior times meta-prior.''' 
 
     def implicit_relation( x, y, compACTexp ):
         N, K = compACTexp.N,  compACTexp.K
         nn = compACTexp.nn
 
-        tmp = K * diGmm(N+K*x) - K * diGmm(K*x) + K * diGmm(x) - compACTexp._ffsum(diGmm(nn+x))
-        tmp += ( K**2 * quadriGmm(K*x+1) - quadriGmm(x+1) ) / ( K * triGmm(K*x+1) - triGmm(x+1) )
+        tmp = diGmm(N+K*x) - compACTexp._ffsum(diGmm(nn+x)) / K  + D_diGmm(x, K*x)
+        tmp += ( K * quadriGmm(K*x+1) - quadriGmm(x+1) / K ) / ( K * triGmm(K*x+1) - triGmm(x+1) )
         return tmp - y
 
-    output = get_from_implicit_(implicit_relation, 0, upper, lower, compACTexp )
+    # FIXME : handwavy solution
+    if implicit_relation( lower, 0, compACTexp ) > 0 :
+        y = 1.001 * implicit_relation( lower, 0, compACTexp )
+    elif implicit_relation( upper, 0, compACTexp ) < 0 :
+        y = 1.001 * implicit_relation( upper, 0, compACTexp )
+    else :
+        y = 0
+
+    output = get_from_implicit_(implicit_relation, y, upper, lower, compACTexp )
     return output
 
-def optimal_crossentropy_param_( compACTexp, upper=1e-4, lower=1e2 ) :
+def optimal_crossentropy_param_( compACTexp, lower=1e-5, upper=1e3 ) :
     '''Return NSB parameter crossentropy posterior times meta-prior.''' 
 
     def implicit_relation( x, y, compACTexp ):
         N, K = compACTexp.N,  compACTexp.K
         nn = compACTexp.nn
 
-        tmp = K * diGmm(N+K*x) - K * diGmm(K*x) + K * diGmm(x) - compACTexp._ffsum(diGmm(nn+x))
-        tmp += ( K**2 * quadriGmm(K*x) - quadriGmm(x) ) / ( K * triGmm(K*x) - triGmm(x) )
+        tmp = diGmm(N+K*x) - compACTexp._ffsum(diGmm(nn+x)) / K  + D_diGmm(x, K*x)
+        tmp += ( K * quadriGmm(K*x) - quadriGmm(x) / K ) / ( K * triGmm(K*x) - triGmm(x) )
+
         return tmp - y
 
-    output = get_from_implicit_(implicit_relation, 0, upper, lower, compACTexp )
+    # FIXME : handwavy solution
+    if implicit_relation( lower, 0, compACTexp ) > 0 :
+        y = 1.001 * implicit_relation( lower, 0, compACTexp )
+    elif implicit_relation( upper, 0, compACTexp ) < 0 :
+        y = 1.001 * implicit_relation( upper, 0, compACTexp )
+    else :
+        y = 0
+
+    output = get_from_implicit_(implicit_relation, y, upper, lower, compACTexp )
     return output
 
-def optimal_ed_param_( compACTdiv, upper=1e-4, lower=1e2 ) :
+
+
+def optimal_dirichlet_EP_param_( compACTdiv, lower=1e-5, upper=1e3 ) :
     '''Return Dirchlet parameter which optimizes divergence posterior alpha=beta (~).''' 
 
     def implicit_relation( x, y, compACTdiv ):
         N_1, N_2, K  = compACTdiv.N_1, compACTdiv.N_2, compACTdiv.K
         nn_1, nn_2 = compACTdiv.nn_1, compACTdiv.nn_2
 
-        tmp = K * diGmm(N_1+K*x) - K * diGmm(K*x) + K * diGmm(x) - compACTdiv._ffsum(diGmm(nn_1+x))
-        tmp += K * diGmm(N_2+K*x) - K * diGmm(K*x) + K * diGmm(x) - compACTdiv._ffsum(diGmm(nn_2+x))
+        tmp = diGmm(N_1+K*x) - compACTdiv._ffsum(diGmm(nn_1+x)) / K + 2 * D_diGmm(x, K*x)
+        tmp += diGmm(N_2+K*x) - compACTdiv._ffsum(diGmm(nn_2+x)) / K 
 
         return tmp - y
 
-    output = get_from_implicit_(implicit_relation, 0, upper, lower, compACTdiv )
+    # FIXME : handwavy solution
+    if implicit_relation( lower, 0, compACTdiv ) > 0 :
+        y = 1.001 * implicit_relation( lower, 0, compACTdiv )
+    elif implicit_relation( upper, 0, compACTdiv ) < 0 :
+        y = 1.001 * implicit_relation( upper, 0, compACTdiv )
+    else :
+        y = 0
+
+    output = get_from_implicit_(implicit_relation, y, upper, lower, compACTdiv )
     return output
 
+def optimal_divergence_EP_param_( compACTdiv, lower=1e-5, upper=1e3 ) :
+    '''Return Dirchlet parameter which optimizes divergence posterior alpha=beta (~).''' 
+
+    def implicit_relation( x, y, compACTdiv ):
+        N_1, N_2, K  = compACTdiv.N_1, compACTdiv.N_2, compACTdiv.K
+        nn_1, nn_2 = compACTdiv.nn_1, compACTdiv.nn_2
+
+        tmp = diGmm(N_1+K*x) - compACTdiv._ffsum(diGmm(nn_1+x)) / K + 2 * D_diGmm(x, K*x)
+        tmp += diGmm(N_2+K*x) - compACTdiv._ffsum(diGmm(nn_2+x)) / K 
+        tmp += 2 / (K * x)
+
+        return tmp - y
+
+    # FIXME : handwavy solution
+    if implicit_relation( lower, 0, compACTdiv ) > 0 :
+        y = 1.001 * implicit_relation( lower, 0, compACTdiv )
+    elif implicit_relation( upper, 0, compACTdiv ) < 0 :
+        y = 1.001 * implicit_relation( upper, 0, compACTdiv )
+    else :
+        y = 0
+
+    output = get_from_implicit_(implicit_relation, y, upper, lower, compACTdiv )
+    return output
 
 def get_from_implicit_( implicit_relation, y, lower, upper, *args,
                       maxiter=100, xtol=1.e-20 ):
@@ -138,11 +196,12 @@ def get_from_implicit_( implicit_relation, y, lower, upper, *args,
     >    `implicit relation` ( x, *args ) - `y` = 0
     It uses the Brent's algorithm for the root finder in the interval (lower, upper)
     '''   
-    # FIXME try with wider lower, upper in case falure
 
     # NOTE : the implicit_relation must have opposite signs in lower and upper
+    # FIXME : try with wider lower, upper in case failure
+
     output = optimize.brentq( implicit_relation, lower, upper,
-                             args=( y , *args ), xtol=xtol, maxiter=maxiter )
+                            args=( y , *args ), xtol=xtol, maxiter=maxiter )
     return output
                                                   
 def implicit_entropy_vs_alpha_( alpha, entropy, K ):

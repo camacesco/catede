@@ -158,7 +158,7 @@ def experiment_rank_plot(
     N = experiment_object.tot_counts
     x = np.arange(len(sequences)) + 1
     y = sequences.sort_values(ascending=False).values / N
-    ax.scatter( x ,y, color=color )
+    ax.plot( x ,y, ls="", marker="o", color=color )
     return ax
 
 def divergence_rank_plot( 
@@ -185,7 +185,7 @@ def divergence_rank_plot(
 
     x = np.arange(len(data_hist)) + 1
     y1 = sequences_1.values / N_1
-    ax.scatter( x, y1, color=color1 )
+    ax.plot( x, y1, ls="", marker="o", color=color1 )
     y2 = sequences_2.values / N_2
-    ax.scatter( x, y2, color=color2 )
+    ax.plot( x, y2, ls="", marker="s", color=color2 )
     return ax

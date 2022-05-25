@@ -17,8 +17,8 @@ import tqdm
 from ._wolpert_wolf_calculus import *
 
 def Kullback_Leibler_CMW(
-    compACTdiv, n_bins=5e1, cutoff_ratio=4, error=False,
-    CPU_Count=None, verbose=False, equal_diversity=False,
+    compACTdiv, n_bins=2e1, cutoff_ratio=4, error=False,
+    CPU_Count=None, verbose=False, equal_prior=False,
     ) :
     '''Kullback-Leibler divergence estimation with Camaglia Mora Walczak method.'''
 
@@ -48,82 +48,109 @@ def Kullback_Leibler_CMW(
     except :
         CPU_Count = multiprocessing.cpu_count()
 
-    # FIXME :
-    if equal_diversity is True : # alpha = beta
-        from ._cmw_KL_eqdiv_divergence import Kullback_Leibler_CMW_eqdiv
-        return Kullback_Leibler_CMW_eqdiv(
-            compACTdiv, n_bins=n_bins, cutoff_ratio=cutoff_ratio, error=error,
-            CPU_Count=CPU_Count, verbose=verbose
-            )
+    K = compACTdiv.K
+    disable = not verbose 
 
+    aux_range = np.append(
+        np.logspace( -0.1, 0, np.floor(n_bins/2).astype(int) )[:-1],
+        np.logspace( 0, 0.1, np.ceil(n_bins/2).astype(int) )
+        )
+
+    if equal_prior is True : # alpha == beta
+        # FIXME :
+        pass
+
+        a_NSB_star = optimal_divergence_EP_param_( compACTdiv )
+        alpha_vec = a_NSB_star * aux_range
+        D_vec = ( 1. - 1./K ) / alpha_vec
+
+        mu_alpha_1 = np.asarray(list(map( compACTdiv.compact_1._measureMu, alpha_vec )))  
+        mu_alpha_1 /= np.max( mu_alpha_1 )
+        mu_alpha_2 = np.asarray(list(map( compACTdiv.compact_2._measureMu, alpha_vec )))  
+        mu_alpha_2 /= np.max( mu_alpha_2 )
+
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>
+        #  DKL estimator vs alpha  #
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>
+
+        # multiprocessing (WARNING:)
+        POOL = multiprocessing.Pool( CPU_Count )  
+            
+        args = [ x for x in zip(alpha_vec, alpha_vec) ]
+        all_DKL_a = POOL.starmap(
+            compACTdiv._post_divergence,
+            tqdm.tqdm(args, total=len(args), desc='Evaluations', disable=disable)
+            )
+        all_DKL_a = np.asarray( all_DKL_a )
+        
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>
+        #  DKL2 estimator vs alpha  #
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>
+            
+        if error is True :
+            all_DKL2_a = POOL.starmap(
+                compACTdiv._post_divergence_squared,
+                tqdm.tqdm(args, total=len(args), desc='Squared', disable=disable)
+                )
+            all_DKL2_a = np.asarray( all_DKL2_a )
+        
+        POOL.close()
+
+        # >>>>>>>>>>>>>>>>>
+        #   integrations  #
+        # >>>>>>>>>>>>>>>>>
+
+        Zeta = integral_with_mu_( mu_alpha_1, mu_alpha_2, D_vec )
+        DKL1 = integral_with_mu_( mu_alpha_1, np.multiply(mu_alpha_2, all_DKL_a), D_vec ) 
+        DKL1 = mp.fdiv( DKL1, Zeta )  
+        if error is False :  
+            kullback_leibler_estimate = np.array(DKL1, dtype=np.float) 
+        else :
+            DKL2 = mp.fdiv( integral_with_mu_(mu_alpha_1, np.multiply(mu_alpha_2, all_DKL2_a), D_vec ), Zeta )  
+            DKL_devStd = np.sqrt(DKL2 - np.power(DKL1, 2))  
+            kullback_leibler_estimate = np.array([DKL1, DKL_devStd], dtype=np.float)   
+    
     else : # standard alpha != beta
 
-        K = compACTdiv.K
-        disable = not verbose 
-            
-        # >>>>>>>>>>>>>>>>>>>>>>>>>
-        #  Compute Alpha and Beta #
-        # >>>>>>>>>>>>>>>>>>>>>>>>>       
+        # >>>>>>>>>>>>>>>>>>>>
+        #  PRE COMPUTATIONS  #
+        # <<<<<<<<<<<<<<<<<<<<
 
-        # FIXME : this choice makes sense ny if the meta prior is negligible
+        #  Compute Alpha and Beta #   
 
-        aux_range = np.append(
-            np.logspace( -0.01, 0, np.floor(n_bins/2).astype(int) ),
-            np.logspace( 0, 0.01, np.ceil(n_bins/2).astype(int) )[1:]
-            )
+        # FIXME : this choice is arbitrary! works fine if the meta prior is negligible
 
-        a_NSB_star = optimal_entropy_param_( compACTdiv.compact_1, upper=1e-5, lower=1e3 )
+        a_NSB_star = optimal_entropy_param_( compACTdiv.compact_1 )
         alpha_vec = a_NSB_star * aux_range
         A_vec = list(map( lambda a : implicit_entropy_vs_alpha_(a, 0, K), alpha_vec ) )
 
-        b_NSB_star = optimal_crossentropy_param_( compACTdiv.compact_2, upper=1e-5, lower=1e3 )
+        b_NSB_star = optimal_crossentropy_param_( compACTdiv.compact_2 )
         beta_vec = b_NSB_star * aux_range
         B_vec = list(map( lambda b : implicit_crossentropy_vs_beta_(b, 0, K), beta_vec ) )
 
-        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         #  Compute MeasureMu alpha and beta #
-        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        
-        # multiprocessing (WARNING:)
-        POOL = multiprocessing.Pool( CPU_Count )  
-        
-        args = alpha_vec     
-        measures = POOL.map(
-            compACTdiv.compact_1._measureMu,
-            tqdm.tqdm(args, total=len(args), desc='Pre-computations 1/3', disable=disable)
-            )
-        mu_alpha = np.asarray( measures )  
+        mu_alpha = np.asarray(list(map( compACTdiv.compact_1._measureMu, alpha_vec )))  
         mu_alpha /= np.max( mu_alpha )
-
-        args = beta_vec     
-        measures = POOL.map(
-            compACTdiv.compact_2._measureMu,
-            tqdm.tqdm(args, total=len(args), desc='Pre-computations 2/3', disable=disable)
-            )
-        mu_beta = np.asarray( measures )  
+        mu_beta = np.asarray(list(map( compACTdiv.compact_2._measureMu, beta_vec )))  
         mu_beta /= np.max( mu_beta )
                     
-        # >>>>>>>>>>>>>>>>
         #  Compute MetaPrior_DKL   #
-        # >>>>>>>>>>>>>>>>
-            
-        args = [ x + (compACTdiv.K, cutoff_ratio,) for x in itertools.product(A_vec, B_vec)]
-        all_phi = POOL.starmap(
-            MetaPrior_DKL,
-            tqdm.tqdm(args, total=len(args), desc='Pre-computations 3/3', disable=disable)
-            )
+        args = [ x for x in itertools.product(A_vec, B_vec)]
+        all_phi = list(map( lambda x : MetaPrior_DKL(x[0], x[1], K, cutoff_ratio), args ))
         all_phi = np.asarray( all_phi ).reshape(len(A_vec), len(B_vec))
 
-        
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         #  DKL estimator vs alpha,beta  #
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+        # multiprocessing (WARNING:)
+        POOL = multiprocessing.Pool( CPU_Count )  
             
         # FIXME : choose args here only where MetaPrior_DKL > 0
         args = [ x for x in itertools.product(alpha_vec, beta_vec)]
         all_DKL_ab = POOL.starmap(
             compACTdiv._post_divergence,
-            tqdm.tqdm(args, total=len(args), desc='Evaluations', disable=disable)
+            tqdm.tqdm(args, total=len(args), desc='Evaluations...', disable=disable)
             )
         all_DKL_ab = np.asarray( all_DKL_ab ).reshape(len(A_vec), len(B_vec))
         all_DKL_ab_times_phi = np.multiply( all_phi, all_DKL_ab )
@@ -136,11 +163,11 @@ def Kullback_Leibler_CMW(
             # FIXME : choose args here only where all_DKL_ab > a certain threshold
             all_DKL2_ab = POOL.starmap(
                 compACTdiv._post_divergence_squared,
-                tqdm.tqdm(args, total=len(args), desc='Error evaluations', disable=disable)
+                tqdm.tqdm(args, total=len(args), desc='Squared', disable=disable)
                 )
             all_DKL2_ab = np.asarray( all_DKL2_ab ).reshape(len(A_vec), len(B_vec))
             all_DKL2_ab_times_phi = np.multiply( all_phi, all_DKL2_ab )
-        
+
         # >>>>>>>>>>>>>>>>>
         #   integrations  #
         # >>>>>>>>>>>>>>>>>
@@ -152,16 +179,17 @@ def Kullback_Leibler_CMW(
             
         integrations_a = POOL.starmap(
             integral_with_mu_,
-            tqdm.tqdm(args, total=len(args), desc='Integration', disable=disable)
+            tqdm.tqdm(args, total=len(args), desc='Final Integration', disable=disable)
             )
         integrations_a = np.asarray(  integrations_a )
-        
+                
         # multiprocessing (WARNING:)    
         POOL.close()
         
         Zeta = integral_with_mu_( mu_alpha, integrations_a[:len(A_vec)], A_vec )
         DKL1 = integral_with_mu_( mu_alpha, integrations_a[len(A_vec):2*len(A_vec)], A_vec ) 
         DKL1 = mp.fdiv( DKL1, Zeta )  
+        
         if error is False :  
             kullback_leibler_estimate = np.array(DKL1, dtype=np.float) 
         else :
@@ -169,4 +197,4 @@ def Kullback_Leibler_CMW(
             DKL_devStd = np. sqrt(DKL2 - np.power(DKL1, 2))  
             kullback_leibler_estimate = np.array([DKL1, DKL_devStd], dtype=np.float)   
         
-        return kullback_leibler_estimate
+    return kullback_leibler_estimate
