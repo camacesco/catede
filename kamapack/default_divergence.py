@@ -9,16 +9,16 @@
 
 import numpy as np 
 from .cmw_KL_divergence import Kullback_Leibler_CMW
-from ._wolpert_wolf_calculus import optimal_dirichlet_param_
+from ._wolpert_wolf_calculus import *
 from ._aux_shannon import _unit_Dict_
 
 _method_List_ = [
     "naive", "maximum-likelihood",
     "CMW",
     "D", "Dirichlet", 
-    "Jeffreys", "Krichevsky-Trofimov", 
+    "J", "Jeffreys", "Krichevsky-Trofimov", 
     "L", "Laplace", 
-    "minimax", "Trybula", 
+    "mm", "minimax", "Trybula", 
     "SG", "Schurmann-Grassberger",
 ]
 _which_List_ = ["Jensen-Shannon", "Kullback-Leibler"]
@@ -61,7 +61,7 @@ def switchboard( compACT, method="naive", unit=None, which="Kullback-Leibler", *
             b = a
         dkl_estimate = Dirichlet( compACT, a, b, which=which )       
     
-    elif method in ["Jeffreys", "Krichevsky-Trofimov"] :
+    elif method in ["J", "Jeffreys", "Krichevsky-Trofimov"] :
         a = 0.5
         b = 0.5
         dkl_estimate = Dirichlet( compACT, a, b, which=which )
@@ -71,7 +71,7 @@ def switchboard( compACT, method="naive", unit=None, which="Kullback-Leibler", *
         b = 1.
         dkl_estimate = Dirichlet( compACT, a, b, which=which )
         
-    elif method in ["minimax", "Trybula"]:  
+    elif method in ["mm", "minimax", "Trybula"]:  
         a = np.sqrt( compACT.N_1 ) / compACT.compact_1.K
         b = np.sqrt( compACT.N_2 ) / compACT.compact_2.K
         dkl_estimate = Dirichlet( compACT, a, b, which=which )
@@ -128,25 +128,30 @@ def Dirichlet( compACT, a, b, which="Kullback-Leibler", ):
     # delete 0 counts
     nn_1, nn_2, ff = compACT.nn_1, compACT.nn_2, compACT.ff
 
-    if a == "optimal" :
-        a = optimal_dirichlet_param_(compACT.compact_1)
+    if a == "equal-prior" or b == "equal-prior" :
+        a = optimal_dirichlet_EP_param_(compACT)
+        b = a
     else :
-        try:
-            a = np.float64(a)
-        except :
-            raise IOError('The Dirichlet parameter must be a scalar.')
-        if a < 0 :
-            raise IOError('The Dirichlet parameter must greater than 0.')
 
-    if b == "optimal" :
-        b = optimal_dirichlet_param_(compACT.compact_2)
-    else :
-        try:
-            b = np.float64(b)
-        except :
-            raise IOError('The Dirichlet parameter must be a scalar.')
-        if b < 0 :
-            raise IOError('The Dirichlet parameter must greater than 0.')
+        if a == "optimal" :
+            a = optimal_dirichlet_param_(compACT.compact_1)
+        else :
+            try:
+                a = np.float64(a)
+            except :
+                raise IOError('The Dirichlet parameter must be a scalar.')
+            if a < 0 :
+                raise IOError('The Dirichlet parameter must greater than 0.')
+
+        if b == "optimal" :
+            b = optimal_dirichlet_param_(compACT.compact_2)
+        else :
+            try:
+                b = np.float64(b)
+            except :
+                raise IOError('The Dirichlet parameter must be a scalar.')
+            if b < 0 :
+                raise IOError('The Dirichlet parameter must greater than 0.')
 
     hh_1_a = ( nn_1 + a ) / ( N_1 + K*a )     # frequencies with pseudocounts
     hh_2_b = ( nn_2 + b ) / ( N_2 + K*b )     # frequencies with pseudocounts

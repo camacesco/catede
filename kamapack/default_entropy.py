@@ -13,6 +13,17 @@ from . import nsb_entropy
 from ._wolpert_wolf_calculus import optimal_dirichlet_param_
 from ._aux_shannon import _unit_Dict_
 
+_method_List_ = [
+    "naive", "maximum-likelihood",
+    "NSB",
+    "D", "Dirichlet", 
+    "J", "Jeffreys", "Krichevsky-Trofimov", 
+    "MM", "Miller-Madow", 
+    "L", "Laplace", 
+    "mm", "minimax", "Trybula", 
+    "SG", "Schurmann-Grassberger",
+]
+
 #################
 #  SWITCHBOARD  #
 #################
@@ -48,7 +59,7 @@ def switchboard( compACT, method="naive", unit=None, **kwargs ):
         a = 1.
         shannon_estimate = Dirichlet( compACT, a )
 
-    elif method in ["Jeffreys", "Krichevsky-Trofimov"] :
+    elif method in ["J", "Jeffreys", "Krichevsky-Trofimov"] :
         a = 0.5
         shannon_estimate = Dirichlet( compACT, a )
 
@@ -56,13 +67,13 @@ def switchboard( compACT, method="naive", unit=None, **kwargs ):
         a = 1. / compACT.Kobs
         shannon_estimate = Dirichlet( compACT, a )
         
-    elif method in ["minimax", "Trybula"]:
+    elif method in ["mm", "minimax", "Trybula"]:
         # FIXME: warning
         a = np.sqrt( compACT.N ) / compACT.K
         shannon_estimate = Dirichlet( compACT, a )
 
     else:
-        raise IOError("The chosen method is unknown.")
+        raise IOError("Unkown method. Please choose `method` amongst :", _method_List_ )
 
     return unit_conv * shannon_estimate
 ###

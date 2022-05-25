@@ -73,11 +73,17 @@ class Experiment( Skeleton_Class ) :
             raise ValueError("Unrecognized count value in `data`.")    
 
         self.data_hist = data_hist
+        # total n. of counts
         self.tot_counts = np.sum( data_hist.values )  
-        self.obs_n_categ = len( data_hist ) # observed categories
+        # n. of observed categories
+        self.obs_n_categ = (data_hist > 0).sum() 
+        # frquencies of observed counts
         temp = pd.Series( data_hist.values ).astype(int)
+
         self.counts_hist = temp.groupby( temp ).size()  
         self.counts_hist.name = "freq"
+        # n. of coincidences
+        self.obs_coincedences = self.counts_hist[ self.counts_hist.index > 1 ].sum()
 
         #  Load categories  #
         self.update_categories( categories )

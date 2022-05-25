@@ -43,23 +43,22 @@ def NemenmanShafeeBialek(
     #  Compute Alpha  #
     # >>>>>>>>>>>>>>>>>
 
-    a_NSB_star = optimal_entropy_param_( compACTexp, upper=1e-5, lower=1e3 )
-    alpha_vec = a_NSB_star * np.append(np.logspace( -0.01, 0, int(n_bins/2) ), np.logspace( 0, 0.01, int(n_bins/2) )[1:] )
+    a_NSB_star = optimal_entropy_param_( compACTexp )
+    aux_range = np.append(
+        np.logspace( -0.25, 0, np.floor(n_bins/2).astype(int) )[:-1],
+        np.logspace( 0, 0.25, np.ceil(n_bins/2).astype(int) )
+    )
+    alpha_vec = a_NSB_star * aux_range
     A_vec = list(map( lambda a : implicit_entropy_vs_alpha_(a, 0, K), alpha_vec ) )
     
-    POOL = multiprocessing.Pool( CPU_Count )   
-
-    args = alpha_vec
-    measures = POOL.map(
-        compACTexp._measureMu,
-        tqdm.tqdm(args, total=len(args), desc='Pre-computations 2/2', disable=disable)
-        )
-    mu_a = np.asarray( measures )  
+    mu_a = np.asarray( list(map( compACTexp._measureMu,  alpha_vec )) )
         
     # >>>>>>>>>>>>>>>>>>>>>>>
     #  estimators vs alpha  #
     # >>>>>>>>>>>>>>>>>>>>>>>
     
+    POOL = multiprocessing.Pool( CPU_Count )   
+
     args = alpha_vec
     all_S1_a = POOL.map(
         compACTexp._post_entropy,
