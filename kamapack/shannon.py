@@ -22,7 +22,7 @@ def load_class( filename ) :
 ######################
 
 class Experiment( Skeleton_Class ) :
-    '''The basic class for estimating entropy from dataset distribution.
+    '''A class for entropy estimation from data distribution.
     
     Methods
     -------
@@ -31,36 +31,38 @@ class Experiment( Skeleton_Class ) :
 
     __doc__ += Skeleton_Class.__doc__
     
-    def __init__( self, data, categories=None, iscount=False ):
+    def __init__( self, data_hist, categories=None, ishist=True ):
         '''
         Parameters
         ----------    
-        data : Union[dict, pd.DataFrame, pd.Series, list, np.array] 
-            pd.DataFrame (deprecated)
+        data_hist : Union[dict, pd.DataFrame, pd.Series, list, np.array] 
+            The number of observations for each category or a raw list of observations (deprecated).
         categories : scalar, optional
-        iscount : bool
-            (default is False)
+            The a priori total number of categories.
+        ishist : bool
+            When `data_hist` is a list of integers, it specifies wheter it is a histogram (True, default) 
+            or a raw list of observations (False, deprecated).
         '''
         
-        #  Load data  #
-        if type( data ) == dict :   
+        #  Load data_hist #
+        if type( data_hist ) == dict :   
             # loading dictionary where values represent keys counts                                    
-            data_hist = pd.Series( data )
-        elif type( data ) == pd.DataFrame :
+            data_hist = pd.Series( data_hist )
+        elif type( data_hist ) == pd.DataFrame :
             # loading datafame where values represent keys counts 
             data_hist = data[ data.columns[0] ]
             if len( data.columns ) > 1 :
                 warnings.warn("The parameter `data` contained multiple columns, only the first one is considered.")
-        elif type( data ) == pd.Series :
+        elif type( data_hist ) == pd.Series :
             # loading series where values represent index counts
-            data_hist = data
-        elif type( data ) == list or type( data ) == np.ndarray :                              
-            if iscount == True :
+            data_hist = data_hist
+        elif type( data_hist ) == list or type( data_hist ) == np.ndarray :                              
+            if ishist == True :
                 # loading list of counts
-                data_hist = pd.Series( data ).astype(int)
+                data_hist = pd.Series( data_hist ).astype(int)
             else :
                 # loading raw list of sequences
-                temp = pd.Series( data )
+                temp = pd.Series( data_hist )
                 data_hist = temp.groupby( temp ).size()
         else :
             raise TypeError("The parameter `data` has unsopported type.")
