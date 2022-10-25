@@ -9,13 +9,14 @@
 
 import numpy as np
 from scipy.special import comb
+from .new_calculus import optimal_dirichlet_param_
 from . import nsb_entropy
-from ._wolpert_wolf_calculus import optimal_dirichlet_param_
-from ._aux_shannon import _unit_Dict_
+import warnings 
 
 _method_List_ = [
     "naive", "maximum-likelihood",
-    "NSB",
+    "NSB", "Nemenmann-Shafee-Bialek",
+    "CS", "Chao-Shen",
     "D", "Dirichlet", 
     "J", "Jeffreys", "Krichevsky-Trofimov", 
     "MM", "Miller-Madow", 
@@ -23,6 +24,26 @@ _method_List_ = [
     "mm", "minimax", "Trybula", 
     "SG", "Schurmann-Grassberger",
 ]
+
+# unit of the logarithm
+_unit_Dict_ = {
+    "n": 1., "ln": 1., "default": 1.,
+    "2": 1./np.log(2), "log2": 1./np.log(2),
+    "10": 1./np.log(10), "log10": 1./np.log(10),
+}
+
+#############
+#  ALIASES  #
+#############
+
+def entropy_oper( x, y=None ) :
+    ''' - x * log( y ) '''
+    if y is None :
+        # FIXME: zeros in log
+        output = - x * np.log(x)
+    else :
+        output = - x * np.log(y)
+    return output
 
 #################
 #  SWITCHBOARD  #
@@ -34,7 +55,7 @@ def switchboard( compACT, method="naive", unit=None, **kwargs ):
     if unit in _unit_Dict_.keys( ) :
         unit_conv = _unit_Dict_[ unit ]
     else:
-        raise IOError("Unknown unit, please choose amongst ", _unit_Dict_.keys( ) )
+        warnings.warn( "Please choose `unit` amongst :", _unit_Dict_.keys( ), ". Falling back to default." )
 
     # choosing entropy estimation method
     if method in ["naive", "maximum-likelihood"] :    
@@ -51,8 +72,10 @@ def switchboard( compACT, method="naive", unit=None, **kwargs ):
  
     elif method in ["D", "Dirichlet"] :
         if "a" not in kwargs :
-            raise IOError("The Dirichlet parameter `a` must be specified.")
-        a = kwargs['a']
+            a = "optimal"
+            warnings.warn("Dirichlet parameter `a` set to optimal.")
+        else :
+            a = kwargs['a']
         shannon_estimate = Dirichlet( compACT, a )       
         
     elif method in ["L", "Laplace", "Bayesian-Laplace"] :
@@ -68,7 +91,6 @@ def switchboard( compACT, method="naive", unit=None, **kwargs ):
         shannon_estimate = Dirichlet( compACT, a )
         
     elif method in ["mm", "minimax", "Trybula"]:
-        # FIXME: warning
         a = np.sqrt( compACT.N ) / compACT.K
         shannon_estimate = Dirichlet( compACT, a )
 
@@ -90,7 +112,7 @@ def Naive( compACT ):
     # delete 0 counts (if present they are at position 0)
     if 0 in nn : nn, ff = nn[1:], ff[1:]                      
     
-    output = np.log(N) - np.dot( ff , np.multiply( nn, np.log(nn) ) ) / N
+    output = np.log(N) + np.dot( ff , entropy_oper( nn ) ) / N
     return np.array( output )
 ###
 
@@ -140,7 +162,7 @@ def ChaoShen( compACT ):
     p_vec = C * nn / N                                  # coverage adjusted empirical frequencies
     lambda_vec = 1. - np.power( 1. - p_vec, N )         # probability to see a bin (specie) in the sample
 
-    output = - np.dot( ff , p_vec * np.log( p_vec ) / lambda_vec )
+    output = np.dot( ff , entropy_oper( p_vec ) / lambda_vec )
     return np.array( output )
 ###
 
@@ -175,6 +197,6 @@ def Dirichlet( compACT, a ):
     # frequencies with pseudocounts
     hh_a = (nn + a) / (N + K * a)      
     
-    output = - np.dot( ff , hh_a * np.log( hh_a ) )
+    output = np.dot( ff , entropy_oper( hh_a ) )
     return np.array( output )
 ###
