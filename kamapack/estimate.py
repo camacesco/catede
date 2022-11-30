@@ -2,20 +2,21 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) July 2022 Francesco Camaglia, LPENS 
+    Copyright (C) November 2022 Francesco Camaglia, LPENS 
 '''
 
+import sys
 import warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from .beta_func_multivar import Experiment_Compact, Divergence_Compact
-from . import default_entropy, default_divergence
+from . import default_divergence, default_entropy
 
 class Skeleton_Class :
     ''' Auxiliary class for Experiment and Divergence.'''
 
-    def update_categories( self, categories ):
+    def _update_categories( self, categories ):
         '''Change the number of categories.
 
         Parameters
@@ -25,18 +26,19 @@ class Skeleton_Class :
                 If the value is lower than the observed number of categories, 
                 the observed number is used instead.'''
 
+        obs_n_categ = np.max(self.obs_n_categ)
         if categories is None:
-            self.usr_n_categ = self.obs_n_categ    
+            self.usr_n_categ = obs_n_categ    
         else :
             try : 
                 categories = int( categories )
             except :        
                 raise TypeError("The parameter `categories` must be an integer.")
-            if categories > self.obs_n_categ :
+            if categories > obs_n_categ :
                 self.usr_n_categ = categories
             else :
-                self.usr_n_categ = self.obs_n_categ  
-                if categories < self.obs_n_categ :
+                self.usr_n_categ = obs_n_categ 
+                if categories < obs_n_categ :
                     warnings.warn("The parameter `categories` is set equal to the observed number of categories.")
     
     def show( self ):
@@ -127,11 +129,17 @@ class Experiment( Skeleton_Class ) :
 
         #  Load categories  #
         categories = np.max([categories, len(data_hist)])
-        self.update_categories( categories )
+        self._update_categories( categories )
 
         if self.usr_n_categ > self.obs_n_categ :
             self.counts_hist[ 0 ] = self.usr_n_categ - self.obs_n_categ
             self.counts_hist = self.counts_hist.sort_index(ascending=True) 
+
+    def shannon( self, method="naive", unit="ln", **kwargs ):
+        # create an alias to use for clarity
+        __doc__ = self.entropy.__doc___
+
+        return self.entropy( method=method, unit=unit, **kwargs)
 
     def entropy( self, method="naive", unit="ln", **kwargs ):
         '''Estimate Shannon entropy.
@@ -161,11 +169,41 @@ class Experiment( Skeleton_Class ) :
         return numpy.array
         '''
         
-        return default_entropy.switchboard( self.compact(), method=method, unit=unit, **kwargs )
+        return default_entropy.switchboard( self.compact(), which="Shannon", method=method, unit=unit, **kwargs )
+    
+    def simpson( self, method="naive", **kwargs ):
+        '''Estimate Simpson index.
+
+        Simpson infrx estimation through a chosen `method`.
+        The unit (of the logarithm) can be specified with the parameter `unit`.
+            
+        Parameters
+        ----------
+        method: str
+            the name of the entropy estimation method:
+            - "naive": naive estimator (default);
+            - "MM": Miller Madow estimator;
+            - "CS": Chao Shen estimator;       
+            - "shrink": shrinkage estimator;       
+            - "Jeffreys": Jeffreys estimator;
+            - "Laplace": Laplace estimator;
+            - "SG": Schurmann-Grassberger estimator;
+            - "minimax": minimax estimator;
+            - "NSB": Nemenman Shafee Bialek estimator.
+        unit: str, optional
+            the entropy logbase unit:
+            - "ln": natural logarithm (default);
+            - "log2": base 2 logarihtm;
+            - "log10":base 10 logarithm.
+
+        return numpy.array
+        '''
+        
+        return default_entropy.switchboard( self.compact(), which="Simpson", method=method, **kwargs )
     
     def compact( self ) :
         '''It provides aliases for computations.'''
-        return Experiment_Compact( experiment=self )
+        return Experiment_Compact( source=self )
 
     def rank_plot( self, figsize=(3,3), color="#ff0054", xlabel="rank", ylabel="frequency", grid=True, logscale=True) :
         '''Rank plot.'''
@@ -174,6 +212,7 @@ class Experiment( Skeleton_Class ) :
     def save_compact( self, filename ) :
         '''It saves the compact features of Experiment to `filename`.'''
         self.compact( )._save( filename )
+
 
 ######################
 #  DIVERGENCE CLASS  #
@@ -215,29 +254,36 @@ class Divergence( Skeleton_Class ) :
         df = pd.concat( [my_exp_1.data_hist, my_exp_2.data_hist], axis=1 )
         df = df.replace(np.nan, 0).astype(int)
         df.columns = ["Exp-1", "Exp-2"]
-      
         self.data_hist = df
-        self.obs_n_categ = len( df )
-        
-        self.counts_hist = df.groupby(by=["Exp-1", "Exp-2"]).size()
-        
-        categories = np.max([my_exp_1.usr_n_categ, my_exp_2.usr_n_categ])
-        self.update_categories( categories )
-        if self.usr_n_categ > self.obs_n_categ :
-            self.counts_hist[(0,0)] = self.usr_n_categ - self.obs_n_categ
-            self.counts_hist = self.counts_hist.sort_index(ascending=True)
-        self.counts_hist.name = "freq"
 
+        # Observed Categories
+        self.obs_n_categ = pd.Series(
+            {"Exp-1": my_exp_1.obs_n_categ,
+            "Exp-2":my_exp_2.obs_n_categ,
+            "Union":len(self.data_hist.loc[(df>0).any(axis=1)])}
+            )
+        # User Stated Categories
+        categories = np.max([my_exp_1.usr_n_categ, my_exp_2.usr_n_categ, self.obs_n_categ["Union"]])
+        self._update_categories( categories )
+
+        # Counts Histogram
+        self.counts_hist = df.groupby(by=["Exp-1", "Exp-2"]).size()
+        self.counts_hist.name = "freq"
+        # add (0,0) to counts_hist
+        if self.usr_n_categ > self.obs_n_categ["Union"] :
+            self.counts_hist[(0,0)] = self.usr_n_categ - self.obs_n_categ["Union"]
+            self.counts_hist = self.counts_hist.sort_index(ascending=True)
+        
         # WARNING!: is this a deep copy ?
         tmp = self.counts_hist.reset_index(level=[0,1]).copy()
         # experiment 1 copy
         self.exp_1 = Experiment( my_exp_1.data_hist )
-        self.exp_1.update_categories( self.usr_n_categ )
+        self.exp_1._update_categories( self.usr_n_categ )
         counts_1 = tmp[["freq", "Exp-1"]].set_index("Exp-1", drop=True)
         self.exp_1.counts_hist = counts_1["freq"] # convert to series
         # experiment 2 copy
         self.exp_2 = Experiment( my_exp_2.data_hist )
-        self.exp_2.update_categories( self.usr_n_categ )
+        self.exp_2._update_categories( self.usr_n_categ )
         counts_2 = tmp[["freq", "Exp-2"]].set_index("Exp-2", drop=True)
         self.exp_2.counts_hist = counts_2["freq"]
 

@@ -3,9 +3,9 @@
 
 '''
     Multivariate Beta Function Calculus (in development)
-    Copyright (C) July 2022 Francesco Camaglia, LPENS 
+    Copyright (C) October 2022 Francesco Camaglia, LPENS 
 '''
-
+import warnings
 import numpy as np
 import mpmath as mp
 import pandas as pd
@@ -13,27 +13,76 @@ import itertools
 from scipy.special import loggamma, polygamma   
 
 class Experiment_Compact :
-    def __init__( self, experiment ) :
+    def __init__( self, source=None, is_div=None, is_comp=False, load=None ) :
         '''
         '''
-        self.N = experiment.tot_counts                                   # total number of counts
-        self.K = experiment.usr_n_categ                                  # user number of categories
-        self.Kobs = experiment.obs_n_categ                               # observed number of categories
-        self.nn = experiment.counts_hist.index.values                    # counts
-        self.ff = experiment.counts_hist.values                          # recurrency of counts
+
+        if source is None :
+                if load is None :
+                    raise IOError("One between `source` and `load` must be specified.")
+                else :
+                    self._load(filename=load)
+        elif is_div is None :
+            if is_comp is True :
+                # experiment compact
+                warnings.warn("Trying to create a compact experiment from a a compact experiment.")
+                self.N = source.N                                    # total number of counts
+                self.K = source.K                                    # user number of categories
+                self.Kobs = source.Kobs                              # observed number of categories
+                self.nn = source.nn                                  # counts
+                self.ff = source.ff                                  # recurrency of counts
+            else :
+                # experiment
+                self.N = source.tot_counts                           # total number of counts
+                self.K = source.usr_n_categ                          # user number of categories
+                self.Kobs = source.obs_n_categ                       # observed number of categories
+                self.nn = source.counts_hist.index.values            # counts
+                self.ff = source.counts_hist.values                  # recurrency of counts
+        else  :
+            if is_comp is True :
+                # divergence compact
+                self.K = source.K
+                self.ff = source.ff                                   
+                if (is_div == 1) or (is_div == 'A') :                                          
+                    self.Kobs = source.Kobs_1   
+                    self.N = source.N_1                               
+                    self.nn = source.nn_1    
+                elif (is_div == 2) or (is_div == 'B') :                                       
+                    self.Kobs = source.Kobs_2
+                    self.N = source.N_2                               
+                    self.nn = source.nn_2 
+                else :
+                    raise IOError("Unrecognized identifier for `is_div`.")  
+            else :
+                # divergence 
+                self.K = source.usr_n_categ
+                self.ff = source.counts_hist.values                                    
+                if (is_div == 1) or (is_div == 'A') :                                          
+                    self.Kobs = source.exp_1.obs_n_categ   
+                    self.N = source.exp_1.tot_counts                                
+                    self.nn = source.exp_1.counts_hist.index.values     
+                elif (is_div == 2) or (is_div == 'B') :                                       
+                    self.Kobs = source.exp_2.obs_n_categ
+                    self.N = source.exp_2.tot_counts                               
+                    self.nn = source.exp_2.counts_hist.index.values 
+                else :
+                    raise IOError("Unrecognized identifier for `is_div`.")                
 
     def entropy( self, a ) :
-        '''Posterior Multinomial-Dirichlet entropy estimator.'''
+        '''Posterior Multinomial-Dirichlet Shannon entropy estimator.'''
         return post_entropy_( self, a )
 
     def squared_entropy( self, a ) :
-        '''Posterior Multinomial-Dirichlet sqaured entropy estimator.'''
+        '''Posterior Multinomial-Dirichlet sqaured Shannon entropy estimator.'''
         return post_entropy_sqr_( self, a )
 
-    def alphaLikelihood( self,  a ) :
-        '''Dirichlet parameter likelihood (old measure Mu).'''
+    def simpson( self, a ) :
+        '''Posterior Multinomial-Dirichlet Simpson index estimator.'''
+        return post_simpson_( self, a )
 
-        return mp.exp( log_alphaLikelihood( self, a )  )
+    def squared_simpson( self, a ) :
+        '''Posterior Multinomial-Dirichlet sqaured entropy estimator.'''
+        return post_simpson_sqr_( self, a )
 
     def _Omega( self, terms, a ) :
         '''Shift function Omega.'''
@@ -55,8 +104,9 @@ class Experiment_Compact :
     def _ffsum( self, sumGens, dim ) :
         return count_hist_sum_( self.ff, sumGens, dim )
 
-    def _norm_ffsum( self, sumGens, a, dim ) :
-        return Normalize_Omega_( self, dim, a, self._ffsum( sumGens, dim ) )
+    def _norm_ffsum( self, sumGens, a, dim, dimNorm=None ) :
+        if dimNorm is None : dimNorm = dim
+        return Normalize_Omega_( self, dimNorm, a, self._ffsum( sumGens, dim ) )
 
     def _save( self, filename ) : 
         '''Save the Experiment_Compact object to `filename`.'''
@@ -67,7 +117,7 @@ class Experiment_Compact :
         ).to_csv( filename, sep=' ', mode='w', header=False, index=True )
         # counts hist
         pd.DataFrame(
-            { 'nn' : self.nn, 'ff' : self.ff }
+            { 'nn': self.nn, 'ff': self.ff }
         ).to_csv( filename, sep=' ', mode='a', header=True, index=False )  
 
     def _load( self, filename ) : 
@@ -93,20 +143,27 @@ class Experiment_Compact :
 ##############################
     
 class Divergence_Compact :
-    def __init__( self, divergence ) :
+    def __init__( self, div=None, load=None ) :
         ''' '''
+        if div is None :
+            if load is None :
+                raise IOError("one between `exp` and `load` must be specified.")
+            else :
+                self._load(filename=load)
+        else :
+            self.N_1 = div.tot_counts['Exp-1']                           # total number of counts for Exp 1
+            self.N_2 = div.tot_counts['Exp-2']                           # total number of counts for Exp 2
+            self.K = div.usr_n_categ                                     # user number of categories
+            self.Kobs_u = div.obs_n_categ['Union']                       # observed number of categories
+            self.Kobs_1 = div.obs_n_categ['Exp-1']                       # observed number of categories for Exp 1
+            self.Kobs_2 = div.obs_n_categ['Exp-2']                       # observed number of categories for Exp 2
+            temp = np.array(list(map(lambda x: [x[0],x[1]], div.counts_hist.index.values)))
+            self.nn_1 = temp[:,0]                                        # counts for Exp 1
+            self.nn_2 = temp[:,1]                                        # counts for Exp 2
+            self.ff = div.counts_hist.values                             # recurrency of counts
+            self.compact_1 = Experiment_Compact( source=div, is_div=1 )  # compact for Exp 1
+            self.compact_2 = Experiment_Compact( source=div, is_div=2 )  # compact for Exp 1
 
-        self.compact_1 = Experiment_Compact( divergence.exp_1 )          # compact for Exp 1
-        self.compact_2 = Experiment_Compact( divergence.exp_2 )          # compact for Exp 2
-        self.N_1 = divergence.tot_counts['Exp-1']                        # total number of counts for Exp 1
-        self.N_2 = divergence.tot_counts['Exp-2']                        # total number of counts for Exp 2
-        self.K = divergence.usr_n_categ                                  # user number of categories
-        self.Kobs = divergence.obs_n_categ                               # observed number of categories
-        temp = np.array(list(map(lambda x: [x[0],x[1]], divergence.counts_hist.index.values)))
-        self.nn_1 = temp[:,0]                                            # counts for Exp 1
-        self.nn_2 = temp[:,1]                                            # counts for Exp 2
-        self.ff = divergence.counts_hist.values                          # recurrency of counts
-   
     def _ffsum( self, sumList, dim ) :
         return count_hist_sum_( self.ff, sumList, dim )
 
@@ -122,8 +179,8 @@ class Divergence_Compact :
         '''Save the Divergence_Compact object to `filename`.'''
         # parameters
         pd.DataFrame(
-            [ self.N_1, self.N_2, self.K, self.Kobs, len(self.ff) ],
-            index = ['N_1', 'N_2', 'K', 'Kobs', 'size_of_ff']
+            [ self.N_1, self.N_2, self.K, self.Kobs_1, self.Kobs_2, self.Kobs_u, len(self.ff) ],
+            index = ['N_1', 'N_2', 'K', 'Kobs_1', 'Kobs_2', 'Kobs_u', 'size_of_ff']
         ).to_csv( filename, sep=' ', mode='w', header=False, index=True )
         # counts hist
         pd.DataFrame(
@@ -135,19 +192,25 @@ class Divergence_Compact :
         # parameters
         f = open(filename, "r")
         params = {}
-        for _ in range(5) :
+        dict_size = 7
+        for _ in range(dict_size) :
             thisline = f.readline().strip().split(' ')
             params[ thisline[0] ] = thisline[1]
-        self.N_1 = params['N_1']
-        self.N_2 = params['N_2']
-        self.K = params['K']
-        self.Kobs = params['Kobs']
+        self.N_1 = int(params['N_1'])
+        self.N_2 = int(params['N_2'])
+        self.K = int(params['K'])
+        self.Kobs_1 = int(params['Kobs_1'])
+        self.Kobs_2 = int(params['Kobs_2'])
+        self.Kobs_u = int(params['Kobs_u'])
+        size_of_ff = int(params['size_of_ff'])
         #count hist
-        df = pd.read_csv( filename, header=5, sep=' ' )
-        assert len(df) == params['size_of_ff']
+        df = pd.read_csv( filename, header=dict_size, sep=' ' )
+        assert len(df) == size_of_ff
         self.nn_1 = df['nn_1'].values
         self.nn_2 = df['nn_2'].values
         self.ff = df['ff'].values
+        self.compact_1 = Experiment_Compact( source=self, is_div=1, is_comp=True )
+        self.compact_2 = Experiment_Compact( source=self, is_div=2, is_comp=True )
 ###
 
 ################
@@ -219,27 +282,19 @@ def LogGmm( x ):
     ''' alias of Log Gamma function'''
     return loggamma( x ).real  
 
-def log_alphaLikelihood( compExp, alpha ) :
-    '''logarithm computation of the alpha likelihood.'''
-    K = compExp.K
-    x = compExp.nn + alpha
-    X = compExp.N + K * alpha
+# PRIOR ESTIMATORS
 
-    # posterior contribution 
-    def sumGens( x ) : yield LogGmm( x )
-    output = compExp._ffsum( sumGens(x), dim=1 )  - LogGmm( X ) 
-    # Dirichelet prior normalization contribution
-    output += LogGmm( K*alpha ) - K * LogGmm( alpha )                  
-
-    return output
-                                                  
 def prior_entropy_vs_alpha_( alpha, K ):
-    '''Expected entropy for Dirichlet distribution.'''
+    '''Expected Shannon entropy for Dirichlet distribution.'''
     return D_diGmm( K * alpha + 1, alpha + 1 )
 
 def prior_crossentropy_vs_beta_( beta, K ):
     '''Expected crossentropy for independent Dirichlet distributions.'''
     return D_diGmm( K * beta , beta )
+
+def prior_simpson_vs_alpha_( alpha, K ):
+    '''Expected Simpson for Dirichlet distribution.'''
+    return (alpha + 1) / (K * alpha + 1)
 
 ####################################
 #  MULTIVARIATE BETA COMPUTATIONS  #
@@ -254,8 +309,8 @@ def ones(shape):
 def Normalize_Omega_( compExp, shift, a, value ) :
     '''Returns the normalization for the functions Omega.'''
     # NOTE: this should be a control in case of numerical issue (change numpy to mpmath)
-    X = compExp.N + compExp.K * a
-    Norm = np.product([i for i in np.arange(X, X+shift)])
+    X = compExp.K * a + compExp.N
+    Norm = np.product( X*np.ones(shift) + np.arange(0,shift,1) )
     return np.divide( value, Norm )
 
 def ListIndexes( INDEX ) :
@@ -313,6 +368,44 @@ def Omega_( compExp, terms, a) :
             yield outer( xvec * (xvec+1), xvec )
         if (0,1,2) in termsList :                           # i!=j, j!=k, k!=i
             yield outer( xvec, outer( xvec, xvec ) )
+
+    elif shift == 4 :
+        # B (x+i+j+k+h) / B
+        # DIM = 1 (3-edges path joint)
+        if (0,0,0,0) in termsList :                         # i==j==k
+            yield xvec * (xvec+1) * (xvec+2) * (xvec+3)
+        # DIM = 2 (2-edges paths joint)
+        if (0,1,1,1) in termsList :                         # i!==j==k==h
+            yield outer( xvec, xvec * (xvec+1) * (xvec+2) )
+        if (0,1,0,0) in termsList :                         # i==k==h!=j
+            yield outer( xvec * (xvec+1) * (xvec+2), xvec )
+        if (0,0,1,0) in termsList :                         # i==j==h!=k
+            yield outer( xvec * (xvec+1) * (xvec+2), xvec )
+        if (0,0,0,1) in termsList :                         # i==j==k!=h
+            yield outer( xvec * (xvec+1) * (xvec+2), xvec )
+        # DIM = 2 (2-edges paths disjoint)
+        if (0,1,1,0) in termsList :                         # i==h!=j==k
+            yield outer( xvec * (xvec+1), xvec * (xvec+1) )
+        if (0,1,0,1) in termsList :                         # i==k!=h==j
+            yield outer( xvec * (xvec+1), xvec * (xvec+1) )
+        if (0,0,1,1) in termsList :                         # i==j!=k==h
+            yield outer( xvec * (xvec+1), xvec * (xvec+1) )
+        # DIM = 3 (1-edge paths joint)
+        if (0,1,2,2) in termsList :                         # i!=j, i!=k, j!=k, k==h
+            yield outer( xvec, outer( xvec, xvec * (xvec+1) ) )
+        if (0,1,2,1) in termsList :                         # i!=j, j==h, i!=h, j!=k
+            yield outer( xvec, outer( xvec * (xvec+1), xvec ) )
+        if (0,1,2,0) in termsList :                         # i==h, i!=j, i!=k, j!=k
+            yield outer( xvec * (xvec+1), outer( xvec, xvec ) )
+        if (0,1,1,2) in termsList :                         # i!=j, j==k, i!=h, j!=h
+            yield outer( xvec, outer( xvec * (xvec+1), xvec ) )
+        if (0,1,0,2) in termsList :                         # i==k, i!=j, i!=h, j!=h
+            yield outer( xvec * (xvec+1), outer( xvec, xvec ) )
+        if (0,0,1,2) in termsList :                         # i==j, i!=k, i!=h, k!=h
+            yield outer( xvec * (xvec+1), outer( xvec, xvec ) )
+        # DIM = 4 (0-edge path)
+        if (0,1,2,3) in termsList :                         # all != 
+            yield outer( xvec, outer( xvec, outer( xvec, xvec ) ) )
 
 def derOmegaS1_( compExp, terms, a) :
     '''Generator of the functions derivative of Omega.'''
@@ -605,6 +698,24 @@ def post_entropy_sqr_( compExp, a ):
     sumGens = shift_2_deriv_2( compExp, a )
     sum_value = compExp._norm_ffsum( sumGens, a, dim=2 )
     return sum_value
+
+def post_simpson_( compExp, a ):
+    '''Estimate of the entropy at alpha.
+        sum_i < q_i^2 >
+    '''
+    sumGens = compExp._Omega( "ii", a )
+    sum_value = compExp._norm_ffsum( sumGens, a, dim=1, dimNorm=2 )
+    return sum_value
+
+def post_simpson_sqr_( compExp, a ):
+    '''Estimate of the squared entropy at alpha.
+        sum_ij < q_i^2 * q_j^2 >    
+    '''
+
+    sumGens = compExp._Omega( "iijj", a )
+    sum_value = compExp._norm_ffsum( sumGens, a, dim=2, dimNorm=4 )
+    return sum_value
+
 
 def post_divergence_( compDiv, a, b ):
     '''Estimate of the divergence at alpha and beta.

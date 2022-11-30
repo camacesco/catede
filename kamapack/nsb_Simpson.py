@@ -11,13 +11,13 @@ from mpmath import mp
 import multiprocessing
 from tqdm import tqdm
 
-from .new_calculus import optimal_entropy_param_
+from .new_calculus import optimal_simpson_param_
 from .beta_func_multivar import *
 
-def NemenmanShafeeBialek(
+def Simpson_NSB(
     compACTexp, error=False, n_bins=1, CPU_Count=None, verbose=False
     ):
-    ''' Nemenamn-Shafee-Bialekd entropy estimator '''
+    ''' Nemenamn-Shafee-Bialekd Simpson index estimator '''
     
     # >>>>>>>>>>>>>>>>>>>>>>
     #  CHECK user OPTIONS  #
@@ -47,7 +47,7 @@ def NemenmanShafeeBialek(
     #  Compute Alpha  #
     # >>>>>>>>>>>>>>>>>
 
-    a_NSB_star = optimal_entropy_param_( compACTexp )
+    a_NSB_star = optimal_simpson_param_( compACTexp )
     aux_range = np.append(
         np.logspace( -0.25, 0, np.ceil( n_bins / 2 + 0.5 ).astype(int) )[:-1],
         np.logspace( 0, 0.25, np.floor( n_bins / 2 + 0.5 ).astype(int) )
@@ -64,18 +64,18 @@ def NemenmanShafeeBialek(
     if run_parallel is True :
         POOL = multiprocessing.Pool( CPU_Count )  
         tqdm_args = tqdm( args, total=len(args), desc="Error Eval", disable=disable ) 
-        all_S1_a = POOL.map( compACTexp.entropy, tqdm_args )
+        all_S1_a = POOL.map( compACTexp.simpson, tqdm_args )
     else :
-        all_S1_a = [ compACTexp.entropy(args[0]) ]
+        all_S1_a = [ compACTexp.simpson(args[0]) ]
     all_S1_a = np.asarray(all_S1_a)
     
     # squared-entropy (a) computation
     if error is True :
         if run_parallel is True :
             tqdm_args = tqdm( args, total=len(args), desc="Error Eval", disable=disable )
-            all_S2_a = POOL.map( compACTexp.squared_entropy, tqdm_args )   
+            all_S2_a = POOL.map( compACTexp.squared_simpson, tqdm_args )   
         else :
-            all_S2_a = [ compACTexp.squared_entropy(args[0]) ]
+            all_S2_a = [ compACTexp.squared_simpson(args[0]) ]
         all_S2_a = np.asarray(all_S2_a)
         
     if run_parallel is True :
@@ -86,7 +86,7 @@ def NemenmanShafeeBialek(
     # >>>>>>>>>>>>>>>
 
     K = compACTexp.K
-    A_vec = prior_entropy_vs_alpha_( alpha_vec, K ) 
+    A_vec = prior_simpson_vs_alpha_( alpha_vec, K ) 
     mu_a = np.asarray( list(map( compACTexp.alphaLikelihood,  alpha_vec )) )
         
     Zeta = integral_with_mu_(mu_a, 1., A_vec)

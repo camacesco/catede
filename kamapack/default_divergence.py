@@ -3,65 +3,74 @@
 
 '''
     *** Default Divergence ***
-    Copyright (C) January 2022 Francesco Camaglia, LPENS 
-    Following the architecture of J. Hausser and K. Strimmer : https://strimmerlab.github.io/software/entropy/
+    Copyright (C) October 2022 Francesco Camaglia, LPENS 
 '''
 
 import warnings
 import numpy as np 
-from .cmw_KL_divergence import Kullback_Leibler_CMW
-from .default_entropy import _unit_Dict_, entropy_oper
+from .cmw_KullbackLeibler import Kullback_Leibler_CMW
+from .default_entropy import _unit_Dict_, Shannon_oper
 from .new_calculus import optimal_dirichlet_param_
+from scipy.special import rel_entr
 
 _method_List_ = [
     "naive", "maximum-likelihood",
-    "CMW",
+    "CMW", "Camaglia-Mora-Walczak",
     "D", "Dirichlet", 
     "J", "Jeffreys", "Krichevsky-Trofimov", 
     "L", "Laplace", 
     "mm", "minimax", "Trybula", 
     "SG", "Schurmann-Grassberger",
 ]
-_which_List_ = ["Jensen-Shannon", "Kullback-Leibler"]
+
+_which_List_ = ["Hellinger", "Jensen-Shannon", "Kullback-Leibler"]
 
 #############
 #  ALIASES  #
 #############
 
-def KLdivergence_oper( x, y ) :
-    ''' - x * log(y) + x * log(x)  '''
-    return entropy_oper( x, y=y ) - entropy_oper( x )
+def KullbackLeibler_oper( x, y ) :
+    ''' x * log(x/y) '''
+    return rel_entr(x,y)
 
-def JSdivergence_oper( x, y ) :
-    ''' - x * log(y) + x * log(x)  '''
+def JensenShannon_oper( x, y ) :
+    ''' '''
     mm = 0.5 * ( x + y )
-    return - 0.5 * ( entropy_oper( x, y=(x/mm) ) + entropy_oper( y, y=(y/mm) ) )
+    return 0.5 * ( KullbackLeibler_oper( x, mm ) + KullbackLeibler_oper( y, mm ) )
+
+def Bhattacharyya_oper( x, y ) :
+    ''' sqrt( x * y ) '''
+    return np.sqrt( np.multiply( x, y ) ) 
 
 #################
 #  SWITCHBOARD  #
 #################
 
-def switchboard( compACT, method="naive", unit=None, which="Kullback-Leibler", **kwargs ):
-    
-    # loading units
-    if unit in _unit_Dict_ :
-        unit_conv = _unit_Dict_[ unit ]
-    else:
-        warnings.warn( "Please choose `unit` amongst :", _unit_Dict_.keys( ), ". Falling back to default." )
+def switchboard( compACT, method="naive", which="Kullback-Leibler", unit="default", **kwargs ):
 
     # check which 
     if which not in _which_List_ :
         raise IOError("Unkown divergence. Please choose `which` amongst :", _which_List_ )
-
+    
+    # loading units
+    if which in ["Jensen-Shannon", "Kullback-Leibler"] :
+        if unit not in _unit_Dict_.keys( ) :
+            warnings.warn( "Please choose `unit` amongst :", _unit_Dict_.keys( ), ". Falling back to default." )
+        unit_conv = _unit_Dict_.get( unit, _unit_Dict_["default"] )
+    else :
+        unit_conv = 1
+        
     # choosing entropy estimation method
     if method in ["naive", "maximum-likelihood"] :  
         dkl_estimate = Naive( compACT, which=which, **kwargs )
     
-    elif method == "CMW" :                       # Camaglia Mora Walczak (?)
+    elif method in ["CMW", "Camaglia-Mora-Walczak"] :       
         if which in ["Jensen-Shannon"] :
             raise IOError("Unknown method `CMW` for the chosen divergence.")
         elif which == "Kullback-Leibler" :
             dkl_estimate = Kullback_Leibler_CMW( compACT, **kwargs )
+        elif which == "Hellinger" :
+            raise IOError("FIXME: place holder.")
 
     elif method in ["D", "Dirichlet"] :
         a = kwargs.get("a", None)
@@ -69,10 +78,10 @@ def switchboard( compACT, method="naive", unit=None, which="Kullback-Leibler", *
         
         if a is None :
             a = "optimal"
-            warnings.warn("Dirichlet parameter `a` falling back to `optimal`.")
+            #warnings.warn("Dirichlet parameter `a` falling back to `optimal`.")
         if b is None :
             b = "optimal"
-            warnings.warn("Dirichlet parameter `b` falling back to `optimal`.")
+            #warnings.warn("Dirichlet parameter `b` falling back to `optimal`.")
 
         dkl_estimate = Dirichlet( compACT, a, b, which=which )       
     
@@ -106,7 +115,7 @@ def switchboard( compACT, method="naive", unit=None, which="Kullback-Leibler", *
 #  NAIVE  #
 ###########
 
-def Naive( compACT, which="Kullback-Leibler", ) :
+def Naive( compACT, which="Kullback-Leibler", **kwargs) :
     '''Estimation of divergence with frequencies of observed categories.'''
     
     # loading parameters from compACT 
@@ -119,10 +128,13 @@ def Naive( compACT, which="Kullback-Leibler", ) :
     hh_2 = nn_2 / N_2                  # frequencies
     
     if which == "Jensen-Shannon" :
-        output = 0.5 * np.dot( ff, JSdivergence_oper( hh_1, hh_2 ) )
+        output = np.dot( ff, JensenShannon_oper( hh_1, hh_2 ) )
 
     elif which == "Kullback-Leibler" :                       
-        output = np.dot( ff, KLdivergence_oper( hh_1, hh_2 ) )
+        output = np.dot( ff, KullbackLeibler_oper( hh_1, hh_2 ) )
+
+    elif which == "Hellinger" :  
+        output = np.sqrt( 1 - np.dot( ff, Bhattacharyya_oper( hh_1, hh_2 ) ) )
 
     else :
         raise IOError("Unknown method `Naive` for the chosen divergence.")
@@ -133,23 +145,19 @@ def Naive( compACT, which="Kullback-Leibler", ) :
 #  DIRICHELET ESTIMATOR  #
 ##########################
 
-def Dirichlet( compACT, a, b, which="Kullback-Leibler", ):
+def Dirichlet( compACT, a, b, which="Kullback-Leibler", **kwargs ):
     '''Estimation of divergence with Dirichlet-multinomial pseudocount model.
     '''
-
-    # loading parameters from compACT 
-    N_1, N_2, K = compACT.N_1, compACT.N_2, compACT.K
-    nn_1, nn_2, ff = compACT.nn_1, compACT.nn_2, compACT.ff
-
+    # check options
     if a == "optimal" :
         a = optimal_dirichlet_param_(compACT.compact_1)
     else :
         try:
             a = np.float64(a)
         except :
-            raise IOError('The Dirichlet parameter must be a scalar.')
+            raise IOError('The concentration parameter `a` must be a scalar.')
         if a < 0 :
-            raise IOError('The Dirichlet parameter must greater than 0.')
+            raise IOError('The concentration parameter `a` must greater than 0.')
 
     if b == "optimal" :
         b = optimal_dirichlet_param_(compACT.compact_2)
@@ -157,21 +165,28 @@ def Dirichlet( compACT, a, b, which="Kullback-Leibler", ):
         try:
             b = np.float64(b)
         except :
-            raise IOError('The Dirichlet parameter must be a scalar.')
+            raise IOError('The concentration parameter `b` must be a scalar.')
         if b < 0 :
-            raise IOError('The Dirichlet parameter must greater than 0.')
+            raise IOError('The concentration parameter `b` must greater than 0.')
+
+    # loading parameters from compACT 
+    N_1, N_2, K = compACT.N_1, compACT.N_2, compACT.K
+    nn_1, nn_2, ff = compACT.nn_1, compACT.nn_2, compACT.ff
 
     hh_1_a = ( nn_1 + a ) / ( N_1 + K*a )     # frequencies with pseudocounts
     hh_2_b = ( nn_2 + b ) / ( N_2 + K*b )     # frequencies with pseudocounts
 
     if which == "Jensen-Shannon" :
-        output = JSdivergence_oper( hh_1_a, hh_2_b )
+        output = np.dot( ff, JensenShannon_oper( hh_1_a, hh_2_b ) )
 
     elif which == "Kullback-Leibler" :                               
-        output = np.dot( ff, KLdivergence_oper( hh_1_a, hh_2_b ) )
+        output = np.dot( ff, KullbackLeibler_oper( hh_1_a, hh_2_b ) )
+
+    elif which == "Hellinger" :  
+        output = np.sqrt( 1 - np.dot( ff, Bhattacharyya_oper( hh_1_a, hh_2_b ) ) )
 
     else :
-        raise IOError("Unknown method `Dirichlet` for the chosen divergence.")
+        raise IOError("Unknown method `Dirichlet` for the chosen quantity.")
 
     return np.array( output )
 ###
