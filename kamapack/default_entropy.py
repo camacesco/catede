@@ -11,22 +11,22 @@ import numpy as np
 from scipy.special import comb, entr
 from .new_calculus import optimal_dirichlet_param_
 from .nsb_Shannon import Shannon_NSB
-from .nsb_Simpson import Simpson_NSB
+#from .nsb_Simpson import Simpson_NSB # FLAG 
 import warnings 
 
 _method_List_ = [
     "naive", "maximum-likelihood",
     "NSB", "Nemenmann-Shafee-Bialek",
     "CS", "Chao-Shen",
-    "D", "Dirichlet", 
-    "J", "Jeffreys", "Krichevsky-Trofimov", 
+    "Di", "Dirichlet", 
+    "Je", "Jeffreys", "Krichevsky-Trofimov", 
     "MM", "Miller-Madow", 
-    "L", "Laplace", 
-    "mm", "minimax", "Trybula", 
-    "SG", "Schurmann-Grassberger",
+    "La", "Laplace", 
+    "Tr", "minimax", "Trybula", 
+    "Pe", "Schurmann-Grassberger", "Perks",
 ]
 
-_which_List_ = ["Shannon", "Simpson"]
+_which_List_ = ["Shannon"] # ["Shannon", "Simpson"] # FLAG
 
 # unit of the logarithm
 _unit_Dict_ = {
@@ -58,7 +58,7 @@ def switchboard( compACT, method="naive", which="Shannon", unit="default", **kwa
         raise IOError("Unkown divergence. Please choose `which` amongst :", _which_List_ )
 
     # loading units
-    if which in ["Shannon", "Renyi"] :
+    if which in ["Shannon"] :
         if unit not in _unit_Dict_.keys( ) :
             warnings.warn( "Please choose `unit` amongst :", _unit_Dict_.keys( ), ". Falling back to default." )
         unit_conv = _unit_Dict_.get( unit, _unit_Dict_["default"] )
@@ -72,8 +72,8 @@ def switchboard( compACT, method="naive", which="Shannon", unit="default", **kwa
     elif method in ["NSB", "Nemenman-Shafee-Bialek"]:   
         if which == "Shannon" :
             estimate = Shannon_NSB( compACT, **kwargs )
-        elif which == "Simpson" :
-            estimate = Simpson_NSB( compACT, **kwargs )
+        #elif which == "Simpson" :
+        #    estimate = Simpson_NSB( compACT, **kwargs )
         else :
             raise IOError("FIXME: place holder.")
         
@@ -83,7 +83,7 @@ def switchboard( compACT, method="naive", which="Shannon", unit="default", **kwa
     elif method in ["CS", "Chao-Shen"] :        
         estimate = ChaoShen( compACT, which=which, **kwargs )
  
-    elif method in ["D", "Dirichlet"] :
+    elif method in ["Di", "Dirichlet"] :
         if "a" not in kwargs :
             a = "optimal"
             warnings.warn("Dirichlet parameter `a` set to optimal.")
@@ -91,19 +91,19 @@ def switchboard( compACT, method="naive", which="Shannon", unit="default", **kwa
             a = kwargs['a']
         estimate = Dirichlet( compACT, a, which=which, **kwargs )       
         
-    elif method in ["L", "Laplace", "Bayesian-Laplace"] :
+    elif method in ["La", "Laplace", "Bayesian-Laplace"] :
         a = 1.
         estimate = Dirichlet( compACT, a, which=which, **kwargs )
 
-    elif method in ["J", "Jeffreys", "Krichevsky-Trofimov"] :
+    elif method in ["Je", "Jeffreys", "Krichevsky-Trofimov"] :
         a = 0.5
         estimate = Dirichlet( compACT, a, which=which, **kwargs )
 
-    elif method in ["SG", "Schurmann-Grassberger"]:
+    elif method in ["Pe", "Perks", "SG", "Schurmann-Grassberger"]:
         a = 1. / compACT.Kobs
         estimate = Dirichlet( compACT, a, which=which, **kwargs )
         
-    elif method in ["mm", "minimax", "Trybula"]:
+    elif method in ["Tr", "Trybula", "mm", "minimax"]:
         a = np.sqrt( compACT.N ) / compACT.K
         estimate = Dirichlet( compACT, a, which=which, **kwargs )
 
@@ -129,8 +129,9 @@ def Naive( compACT, which ):
 
     if which == "Shannon" :
         output = np.dot( ff , Shannon_oper( hh ) )
-    elif which == "Simpson" :
-        output = np.dot( ff , Simpson_oper( hh ) )
+
+    #elif which == "Simpson" :
+    #    output = np.dot( ff , Simpson_oper( hh ) )
 
     return np.array( output )
 ###
@@ -227,8 +228,8 @@ def Dirichlet( compACT, a, which="Shannon", ):
     if which == "Shannon" :
         output = np.dot( ff, Shannon_oper( hh_a ) )
 
-    elif which == "Simpson" :  
-        output = np.dot( ff, Simpson_oper( hh_a ) )
+    #elif which == "Simpson" :  
+    #    output = np.dot( ff, Simpson_oper( hh_a ) )
 
     else :
         raise IOError("Unknown method `Dirichlet` for the chosen quantity.")

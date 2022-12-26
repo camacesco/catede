@@ -354,7 +354,6 @@ class Divergence( Skeleton_Class ) :
         '''It saves the compact version of Experiment to `filename`.'''
         self.compact( )._save( filename )
 
-
 # >>>>>>>>>>>>
 #  GRAPHICS  #
 # <<<<<<<<<<<<

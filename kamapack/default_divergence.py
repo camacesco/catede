@@ -16,11 +16,11 @@ from scipy.special import rel_entr
 _method_List_ = [
     "naive", "maximum-likelihood",
     "CMW", "Camaglia-Mora-Walczak",
-    "D", "Dirichlet", 
-    "J", "Jeffreys", "Krichevsky-Trofimov", 
-    "L", "Laplace", 
-    "mm", "minimax", "Trybula", 
-    "SG", "Schurmann-Grassberger",
+    "Di", "Dirichlet", 
+    "Je", "Jeffreys", "Krichevsky-Trofimov", 
+    "La", "Laplace", 
+    "Tr", "mm", "minimax", "Trybula", 
+    "Pe", "Perks", "SG", "Schurmann-Grassberger",
 ]
 
 _which_List_ = ["Hellinger", "Jensen-Shannon", "Kullback-Leibler"]
@@ -72,7 +72,7 @@ def switchboard( compACT, method="naive", which="Kullback-Leibler", unit="defaul
         elif which == "Hellinger" :
             raise IOError("FIXME: place holder.")
 
-    elif method in ["D", "Dirichlet"] :
+    elif method in ["Di", "Dirichlet"] :
         a = kwargs.get("a", None)
         b = kwargs.get("b", None)
         
@@ -85,22 +85,22 @@ def switchboard( compACT, method="naive", which="Kullback-Leibler", unit="defaul
 
         dkl_estimate = Dirichlet( compACT, a, b, which=which )       
     
-    elif method in ["J", "Jeffreys", "Krichevsky-Trofimov"] :
+    elif method in ["Je", "Jeffreys", "Krichevsky-Trofimov"] :
         a = 0.5
         b = 0.5
         dkl_estimate = Dirichlet( compACT, a, b, which=which )
     
-    elif method in ["L", "Laplace", "Bayesian-Laplace"] :
+    elif method in ["La", "Laplace", "Bayesian-Laplace"] :
         a = 1.
         b = 1.
         dkl_estimate = Dirichlet( compACT, a, b, which=which )
         
-    elif method in ["mm", "minimax", "Trybula"]:  
+    elif method in ["Tr", "mm", "minimax", "Trybula"]:  
         a = np.sqrt( compACT.N_1 ) / compACT.compact_1.K
         b = np.sqrt( compACT.N_2 ) / compACT.compact_2.K
         dkl_estimate = Dirichlet( compACT, a, b, which=which )
      
-    elif method in ["SG", "Schurmann-Grassberger"]:
+    elif method in ["Pe", "Perks", "SG", "Schurmann-Grassberger"]:
         a = 1. / compACT.compact_1.Kobs
         b = 1. / compACT.compact_2.Kobs
         dkl_estimate = Dirichlet( compACT, a, b, which=which )

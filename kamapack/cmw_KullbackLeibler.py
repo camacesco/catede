@@ -15,8 +15,8 @@ from .new_calculus import *
 from .nsb_Shannon import integral_with_mu_
 
 def Kullback_Leibler_CMW(
-    CompDiv, n_bins=1, cutoff_ratio=4, error=False,
-    CPU_Count=None, verbose=False,
+    CompDiv, n_bins=1, error=False,
+    CPU_Count=None, verbose=False, choice="uniform",
     ) :
     '''Kullback-Leibler divergence estimation with Camaglia Mora Walczak method.'''
 
@@ -24,7 +24,6 @@ def Kullback_Leibler_CMW(
     #  CHECK user OPTIONS  #
     # >>>>>>>>>>>>>>>>>>>>>>
 
-        
     # number of bins
     try :
         n_bins = int(n_bins)
@@ -47,17 +46,12 @@ def Kullback_Leibler_CMW(
     # verbose
     disable = not verbose
 
-    # standard alpha != beta
-    equal_prior = False # FLAG : FIXME developer
-    
-
-
     #  Find Point for Maximum Likelihood #   
-    a_NSB_star, b_NSB_star = optimal_divergence_params_( CompDiv )
+    a_NSB_star, b_NSB_star = optimal_divergence_params_( CompDiv, choice=choice )
 
     if saddle_point_method is True :
 
-        DKL1_star = CompDiv.divergence(a_NSB_star, b_NSB_star)
+        DKL1_star = CompDiv.divergence( a_NSB_star, b_NSB_star )
         if error is True :
             DKL2_star = CompDiv.squared_divergence(a_NSB_star, b_NSB_star)
             DKL_StdDev_star = np. sqrt(DKL2_star - np.power(DKL1_star, 2))  
@@ -70,6 +64,7 @@ def Kullback_Leibler_CMW(
         # <<<<<<<<<<<<<<<<<<<<
 
         # FIXME : to be optimized; also, the parallelization seems to be weak
+        raise SystemError("To be updated")
 
         aux_range = np.append(
             np.logspace( -0.25, 0, np.ceil( n_bins / 2 + 0.5 ).astype(int) )[:-1],
@@ -122,7 +117,7 @@ def Kullback_Leibler_CMW(
 
         #  Compute MetaPrior_DKL   #
         args = [ x for x in itertools.product(A_vec, B_vec) ]
-        all_phi = list(map( lambda x : MetaPrior_DKL(x[0], x[1], K, cutoff_ratio), args ))
+        all_phi = list(map( lambda x : divergenceMetaprior([x[0], x[1]], CompDiv, choice), args ))
         all_phi = np.asarray( all_phi ).reshape(len(alpha_vec), len(beta_vec))
         all_DKL_ab_times_phi = np.multiply( all_phi, all_DKL_ab )
         args = np.concatenate([all_phi, all_DKL_ab_times_phi])

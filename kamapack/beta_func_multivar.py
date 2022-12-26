@@ -292,6 +292,10 @@ def prior_crossentropy_vs_beta_( beta, K ):
     '''Expected crossentropy for independent Dirichlet distributions.'''
     return D_diGmm( K * beta , beta )
 
+def prior_KLdivergence_( alpha, beta, K ):
+    '''Expected crossentropy for independent Dirichlet distributions.'''
+    return prior_crossentropy_vs_beta_( beta, K ) - prior_entropy_vs_alpha_( alpha, K )
+
 def prior_simpson_vs_alpha_( alpha, K ):
     '''Expected Simpson for Dirichlet distribution.'''
     return (alpha + 1) / (K * alpha + 1)

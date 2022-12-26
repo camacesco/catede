@@ -3,217 +3,173 @@
 
 '''
     (in development)
-    Copyright (C) November 2022 Francesco Camaglia, LPENS 
+    Copyright (C) December 2022 Francesco Camaglia, LPENS 
 '''
 
 import numpy as np
 from scipy import optimize 
-from .beta_func_multivar import *
+from kamapack.beta_func_multivar import *
 
-MAX_ITER = 500
-TOL = 1e-16
-BOUND_DIR = (1e-10, 1e3)
+MAX_ITER = 8000
+TOL = 1.0e-16
+BOUND_DIR = (1.0e-5, 1.0e3)
 METHOD='L-BFGS-B'
-INIT_GUESS = 1.
-CUTOFFRATIO = 10
-USE_JAC_OPT = False
+INIT_GUESS = 1.0
+CUTOFFRATIO = 5
+# Warning : CUTOFFRATIO > 1 
+USE_JAC_OPT = True
+NUMERICAL_ZERO = 1.0e-14
+NUMERICAL_INFTY = 1.0e12
 
 ########################################
 #  CONCENTRATION PARAMETER LIKELIHOOD  #
 ########################################
 
-# LIKELIHOOD
+class Likelihood( ) :
+    def __init__( self, var, *args ) : 
+        self.a = var
+        compExp = args[0]
+        self.K = compExp.K
+        self.x = compExp.nn + self.a
+        self.X = compExp.N + self.K * self.a
+        self._ffsum = compExp._ffsum
+    def log( self ) :
+        def sumGens( x ) : yield LogGmm( x )
+        output = self._ffsum( sumGens(self.x), dim=1 ) - LogGmm( self.X ) 
+        output += LogGmm( self.K*self.a ) - self.K * LogGmm( self.a )                  
+        return output
+    def log_jac( self ) :
+        def sumGens( x ) : yield diGmm( x )
+        output = self._ffsum( sumGens(self.x), dim=1 ) - self.K * diGmm( self.X ) 
+        output += self.K * diGmm( self.K*self.a ) - self.K * diGmm( self.a )                  
+        return output
+    def log_hess( self ) :
+        def sumGens( x ) : yield triGmm( x )
+        output = self._ffsum( sumGens(self.x), dim=1 ) - np.power(self.K,2) * triGmm( self.X ) 
+        output += np.power(self.K,2) * triGmm( self.K*self.a ) - self.K * triGmm( self.a )                  
+        return output
 
-def log_alphaLikelihood( var, *args ) :
-    '''log-likelihood for concentration parameter (log of multi-variate Beta).'''
-    alpha = var
-    compExp = args[0]
-    K = compExp.K
-    x = compExp.nn + alpha
-    X = compExp.N + K * alpha
+class DirEntr( ) :
+    def __init__(self, var, *args) :
+        self.a = np.array(var)
+        self.K = args[0] 
+    def aPrioriExp( self ) :
+        return prior_entropy_vs_alpha_(self.a,self.K)
+    def Metapr( self ) :
+        return self.K * triGmm(self.K*self.a+1) - triGmm(self.a+1)
+    def Metapr_jac( self ) :
+        return np.power(self.K,2) * quadriGmm(self.K*self.a+1) - quadriGmm(self.a+1)
+    def Metapr_hess( self ) :
+        return np.power(self.K,3) * polygamma(3,self.K*self.a+1) - polygamma(3,self.a+1)
+    def logMetapr( self ) :
+        return np.log(self.Metapr())
+    def logMetapr_jac( self ) :
+        return self.Metapr_jac() / self.Metapr()
+    def logMetapr_hess( self ) :
+        return self.Metapr_hess() / self.Metapr() - np.power(self.logMetapr_jac(),2)
 
-    # posterior contribution 
-    def sumGens( x ) : yield LogGmm( x )
-    output = compExp._ffsum( sumGens(x), dim=1 )  - LogGmm( X ) 
-    # Dirichelet prior normalization contribution
-    output += LogGmm( K*alpha ) - K * LogGmm( alpha )                  
+class DirCrossEntr( ) :
+    def __init__(self, var, *args) :
+        self.b = np.array(var)
+        self.K = args[0] 
+    def aPrioriExp( self ) :
+        return prior_crossentropy_vs_beta_(self.b,self.K)
+    def Metapr( self ) :
+        return triGmm(self.b) - self.K * triGmm(self.K*self.b)
+    def Metapr_jac( self ) :
+        return quadriGmm(self.b) - np.power(self.K,2) * quadriGmm(self.K*self.b)
+    def Metapr_hess( self ) :
+        return polygamma(3,self.b) - np.power(self.K,3) * polygamma(3,self.K*self.b)
+    def logMetapr( self ) :
+        return np.log(self.Metapr())
+    def logMetapr_jac( self ) :
+        return self.Metapr_jac() / self.Metapr()
+    def logMetapr_hess( self ) :
+        return self.Metapr_hess() / self.Metapr() - np.power(self.logMetapr_jac(),2)
 
-    return output
-    
-def log_alphaLikelihood_jac( var, *args ) :
-    '''1st derivative of the log-likelihood for the concentration parameter.'''
-    alpha = var
-    compExp = args[0]
-    K = compExp.K
-    x = compExp.nn + alpha
-    X = compExp.N + K * alpha
-
-    # posterior contribution 
-    def sumGens( x ) : yield diGmm( x )
-    output = compExp._ffsum( sumGens(x), dim=1 ) - K * diGmm( X ) 
-    # Dirichelet prior normalization contribution
-    output += K * diGmm( K*alpha ) - K * diGmm( alpha )                  
-
-    return output
-
-def log_alphaLikelihood_hess( var, *args ) :
-    '''2nd derivative of the log-likelihood for the concentration parameter.'''
-    alpha = var
-    compExp = args[0]
-    K = compExp.K
-    x = compExp.nn + alpha
-    X = compExp.N + K * alpha
-
-    # posterior contribution 
-    def sumGens( x ) : yield triGmm( x )
-    output = compExp._ffsum( sumGens(x), dim=1 ) - np.power(K,2) * triGmm( X ) 
-    # Dirichelet prior normalization contribution
-    output += np.power(K,2) * triGmm( K*alpha ) - K * triGmm( alpha )                  
-
-    return output
-
-# METAPRIOR : ENTROPY
-
-def log_entropyMetaprior( var, *args ) :
-    '''log of NSB entropy metaprior'''
-    alpha = var
-    compExp = args[0]
-    K = compExp.K
-    output = np.log( K * triGmm(K*alpha+1) - triGmm(alpha+1) )
-    return output
-
-def log_entropyMetaprior_jac( var, *args ) :
-    '''1st derivative of log of NSB entropy metaprior'''
-    alpha = var
-    compExp = args[0]
-    K = compExp.K
-    output = np.power(K,2) * quadriGmm(K*alpha+1) - quadriGmm(alpha+1)
-    output /= log_entropyMetaprior( alpha, compExp )
-    return output
-
-def log_entropyMetaprior_hess( var, *args ) :
-    '''2nd derivative of log of NSB entropy metaprior'''
-    alpha = var
-    compExp = args[0]
-    K = compExp.K
-    output = np.power(K,3) * polygamma(3,K*alpha+1) - polygamma(3,alpha+1)
-    output /= log_entropyMetaprior( alpha, compExp )
-    output -= np.power(log_entropyMetaprior_jac(alpha,compExp),2)
-    return output
-
-# METAPRIOR : CROSSENTROPY
-
-def log_crossentropyMetaprior( var, *args ) :
-    '''log of NSB crossentropy metaprior'''
-    beta = var
-    compExp = args[0]
-    K = compExp.K
-    return np.log( triGmm(beta) - K * triGmm(K*beta) )
-
-def log_crossentropyMetaprior_jac( var, *args ) :
-    '''1st derivative of log of NSB crossentropy metaprior'''
-    beta = var
-    compExp = args[0]
-    K = compExp.K
-    output = quadriGmm(beta) - np.power(K,2) * quadriGmm(K*beta) 
-    output /= log_crossentropyMetaprior(beta, compExp)
-    return output # FIXME : it seems wrong...
-
-def log_crossentropyMetaprior_hess( var, *args ) :
-    '''2nd derivative of log of NSB crossentropy metaprior'''
-    beta = var
-    compExp = args[0]
-    K = compExp.K
-    output = polygamma(3,beta) - np.power(K,3) * polygamma(3,K*beta)
-    output /= log_crossentropyMetaprior(beta, compExp)
-    output -= np.power(log_crossentropyMetaprior_jac(beta, compExp),2)
-    return output
-
-# METAPRIOR : DIVERGENCE
-
-def MetaPrior_DKL( A, B, K, cutoff_ratio ) :
-    '''(auxiliary) Phi term in DKL Metaprior.'''
-
-    D = B - A
-
-    # choice of the prior
-    # FIXME : implement different strategies
-    rho_D = 1. # uniform
-
-    # function by cases 
-    if D >= cutoff_ratio * np.log(K) : # cutoff
-        output = 0.
-    elif D >= np.log(K) : # uniform
-        output = rho_D / np.log(K)
-    else :
-        output = rho_D / D 
-    return output
-
-def log_divergenceMetaprior( var, *args ) :
-    '''logarithm of Phi term in DKL Metaprior.'''
-    alpha, beta = var
-    compDiv, cutoff_ratio = args
-    K = compDiv.K
-
-    A = prior_entropy_vs_alpha_( alpha, K )
-    B = prior_crossentropy_vs_beta_( beta, K )
-
-    return MetaPrior_DKL( A, B, K, cutoff_ratio )
-
-def log_divergenceMetaprior_unif_jac( var, *args ) :
-    '''jacobian of logarithm of Phi term in DKL Metaprior.'''
-    alpha, beta = var
-    compDiv, cutoff_ratio = args
-    K = compDiv.K
-
-    A = prior_entropy_vs_alpha_( alpha, K )
-    B = prior_crossentropy_vs_beta_( beta, K )
-    D = B - A
-
-    # function by cases 
-    output = np.zeros(2)
-    if D >= cutoff_ratio * np.log(K) : # cutoff
-        pass
-    elif D >= np.log(K) : # uniform case
-        pass
-    else :
-        output[0] = ( triGmm(alpha+1) - K * triGmm(K*alpha+1) ) / D 
-        output[1] = ( K * triGmm(K*beta) - triGmm(beta) ) / D 
-    return output
-
-def log_divergenceMetaprior_unif_hess( var, *args ) :
-    '''hessian of logarithm of Phi term in DKL Metaprior.'''
-    alpha, beta = var
-    compDiv, cutoff_ratio = args
-    K = compDiv.K
-    
-    A = prior_entropy_vs_alpha_( alpha, K )
-    B = prior_crossentropy_vs_beta_( beta, K )
-    D = B - A
-
-    # function by cases 
-    output = np.zeros([2,2])
-    if D >= cutoff_ratio * np.log(K) : # cutoff
-        pass
-    elif D >= np.log(K) : # uniform case
-        pass
-    else :
-        # FIXME :
-        output[0,0] = np.power( ( triGmm(alpha+1) - K * triGmm(K*alpha+1) ) / D, 2 )
-        output[0,0] += ( quadriGmm(alpha+1) - np.power(K,2) * quadriGmm(K*alpha+1) ) / D
-        output[0,1] = (triGmm(alpha+1) - K * triGmm(K*alpha+1)) * (triGmm(beta) - K * triGmm(K*beta)) 
-        output[0,1] /= np.power(D,2)
-        output[1,0] = output[0,1]
-        output[1,1] = np.power(( K * triGmm(K*beta) - triGmm(beta) ) / D, 2)
-        output[1,1] += ( np.power(K,2) * quadriGmm(K*beta) - quadriGmm(beta) ) / D
-    return output
+class DirKLdiv( ) :
+    def __init__(self, var, *args ) :
+        # note : get around 0-dimensional numpy scalar arrays
+        self.a = np.array(var[0]).reshape(-1)
+        self.b = np.array(var[1]).reshape(-1)
+        self.K, self.choice = args
+        self.A = prior_entropy_vs_alpha_( self.a, self.K )
+        self.B = prior_crossentropy_vs_beta_( self.b, self.K )
+        self.D = self.B - self.A  
+        if self.choice not in ["uniform", "log-uniform", "scaled"] :
+            raise IOError(f"unrecognized choice `{self.choice}`.")
+    def aPrioriExp( self ) :
+        return self.D
+    def Metapr( self ) :
+        output = np.ones( shape = (self.D.size,) )
+        # function by cases
+        mask = self.D < np.log(self.K)
+        output[ mask ] /= self.D[ mask ]
+        output[ ~mask ] /= np.log(self.K)
+        # choice for rho(D)
+        if self.choice in ["uniform"] :
+            output[ self.D >= CUTOFFRATIO * np.log(self.K) ] = NUMERICAL_ZERO
+            # NOTE : no point in adding the normalization 1. / (CUTOFFRATIO * np.log(self.K))
+        elif self.choice in ["log-uniform"] :
+            output /= self.D
+        elif self.choice in ["scaled"] :
+            output *= np.exp( - self.D / self.A )
+        return output
+    def logMetapr( self ) :
+        if self.choice in ["uniform"] :
+            output = np.zeros( shape = (self.D.size,) )
+            mask = self.D < np.log(self.K) 
+            output[ mask ] = - np.log(self.D[mask])
+            output[ ~mask ] = - np.log(np.log(self.K))
+            output[ self.D >= CUTOFFRATIO * np.log(self.K) ] = - NUMERICAL_INFTY 
+            # NOTE CUTOFFRATIO > 1.
+        else :
+            output = np.log(self.Metapr())
+        return output
+    def logMetapr_jac(self) :
+        output = np.zeros( shape = (self.D.size, 2,) )
+        # term function by cases 
+        mask = self.D < np.log(self.K)
+        output[mask,0] = DirEntr(self.a[mask], self.K).Metapr() / self.D[mask]
+        output[mask,1] = DirCrossEntr(self.b[mask], self.K).Metapr() / self.D[mask]
+        if self.choice in ["uniform"] :
+            output[ ~mask,: ] = NUMERICAL_ZERO
+            output[ self.D >= CUTOFFRATIO * np.log(self.K),: ] = - NUMERICAL_INFTY
+        elif self.choice in ["log-uniform"] :
+            output[:,0] += DirEntr(self.a, self.K).Metapr() / self.D
+            output[:,1] += DirCrossEntr(self.b, self.K).Metapr() / self.D
+        elif self.choice in ["scaled"] :
+            output[:,0] += self.B * DirEntr(self.a, self.K).Metapr() / np.power(self.A,2)
+            output[:,1] += (self.A * DirCrossEntr(self.b, self.K).Metapr() + self.D * DirEntr(self.a, self.K).Metapr()) / np.power(self.A,2)
+        return output
+    def logMetapr_hess( self ) :
+        output = np.zeros( shape = (self.D.size, 2, 2,) )
+        # function by cases 
+        m = self.D < np.log(self.K)
+        output[m,0,0] = DirEntr(self.a[m], self.K).Metapr_jac()/self.D[m] + np.power(DirEntr(self.a[m], self.K).Metapr() / self.D[m],2)
+        output[m,0,1] = DirEntr(self.a[m], self.K).Metapr() * DirCrossEntr(self.b[m], self.K).Metapr() / np.power(self.D[m],2)
+        output[m,1,0] = output[m,0,1]
+        output[m,1,1] = DirCrossEntr(self.b[m], self.K).Metapr_jac()/self.D[m] + np.power(DirCrossEntr(self.b[m], self.K).Metapr()/self.D[m],2)
+        if self.choice in ["uniform"] :
+            output[ ~m,:,: ] = NUMERICAL_ZERO
+            output[ self.D >= CUTOFFRATIO * np.log(self.K),:,: ] = - NUMERICAL_INFTY
+        elif self.choice in ["log-uniform"] :
+            output[:,0,0] += DirEntr(self.a, self.K).Metapr_jac()/self.D + np.power(DirEntr(self.a, self.K).Metapr()/self.D,2)
+            output[:,0,1] += DirEntr(self.a, self.K).Metapr() * DirCrossEntr(self.b, self.K).Metapr() / np.power(self.D,2)
+            output[:,1,0] += DirEntr(self.a, self.K).Metapr() * DirCrossEntr(self.b, self.K).Metapr() / np.power(self.D,2)
+            output[:,1,1] += DirCrossEntr(self.b, self.K).Metapr_jac()/self.D + np.power(DirCrossEntr(self.b, self.K).Metapr()/self.D,2)
+        elif self.choice in ["scaled"] :
+            raise IOError("Yet to be coded... Sorry...")
+        return output
 
 # <<<<<<<<<<<<<<<<<<<<<<
 #  MAXIMUM LIKELIHOOD #
 # >>>>>>>>>>>>>>>>>>>>>> 
 
 def myMinimizer( myfunc, var, args, jac=None ) :
-    # FIXME : extreme cases ?
+    '''.'''
+    
+    if USE_JAC_OPT is False : jac = None
     results = optimize.minimize(
         myfunc,
         x0=var, args=args,
@@ -221,60 +177,46 @@ def myMinimizer( myfunc, var, args, jac=None ) :
         method=METHOD, bounds=(BOUND_DIR,)*len(var), 
         options={'maxiter': MAX_ITER}, tol=TOL
         )
+    # FIXME : warning for extreme cases
     return results.x
 
 def optimal_dirichlet_param_( compExp ) :
-    '''Return Dirichlet parameter which optimizes entropy posterior (~).''' 
+    '''.'''
     def myfunc( var, *args ) :
-        LogLike = log_alphaLikelihood(var, *args)
-        return - LogLike
+        return - Likelihood(var, *args).log()
     def myjac(var, *args) :
-        jac_LogLike = log_alphaLikelihood_jac(var, *args)
-        return - jac_LogLike
-    if USE_JAC_OPT is False : myjac = None
+        return - Likelihood(var, *args).log_jac()
     return myMinimizer( myfunc, [INIT_GUESS], (compExp,), jac=myjac )
 
 def optimal_entropy_param_( compExp ) :
-    '''Return NSB parameter Shannon entropy posterior times meta-prior.''' 
+    '''.'''
     def myfunc(var, *args) :
-        LogLike = log_alphaLikelihood(var, *args) + log_entropyMetaprior(var, *args)
-        return - LogLike
+        return - ( Likelihood(var, *args).log() + DirEntr(var, args[0].K).logMetapr() )
     def myjac(var, *args) :
-        jac_LogLike = log_alphaLikelihood_jac(var, *args) + log_entropyMetaprior_jac(var, *args)
-        return - jac_LogLike
-    if USE_JAC_OPT is False : myjac = None
+        return - ( Likelihood(var, *args).log_jac() + DirEntr(var, args[0].K).logMetapr_jac() )
     return myMinimizer( myfunc, [INIT_GUESS], (compExp,), jac=myjac )
 
 def optimal_crossentropy_param_( compExp ) :
-    '''Return NSB parameter crossentropy posterior times meta-prior. (obsolete)''' 
+    '''(obsolete)''' 
     def myfunc(var, *args) :
-        LogLike = log_alphaLikelihood(var, *args) + log_crossentropyMetaprior(var, *args)
-        return - LogLike
+        return - ( Likelihood(var, *args).log() + DirCrossEntr(var, args[0].K).logMetapr() )
     def myjac(var, *args) :
-        jac_LogLike = log_alphaLikelihood_jac(var, *args) + log_crossentropyMetaprior_jac(var, *args)
-        return - jac_LogLike
-    if USE_JAC_OPT is False : myjac = None
+        return - ( Likelihood(var, *args).log_jac() + DirCrossEntr(var, args[0].K).logMetapr_jac() )
     return myMinimizer( myfunc, [INIT_GUESS], (compExp,), jac=myjac )
 
-def optimal_divergence_params_( compDiv ) :
-    '''Return NSB parameter Shannon entropy posterior times meta-prior.''' 
+def optimal_divergence_params_( compDiv, choice="uniform" ) :
+    '''.'''
     def myfunc(var, *args) :
-        LogLike = log_alphaLikelihood(var[0], args[0].compact_1)
-        LogLike += log_entropyMetaprior(var[0], args[0].compact_1)
-        LogLike += log_alphaLikelihood(var[1], args[0].compact_2) 
-        LogLike += log_crossentropyMetaprior(var[1], args[0].compact_2)
-        LogLike += log_divergenceMetaprior(var, *args)
+        LogLike = DirKLdiv(var, args[0].K, args[1]).logMetapr()
+        LogLike += Likelihood(var[0], args[0].compact_1).log() + DirEntr(var[0], args[0].K).logMetapr()
+        LogLike += Likelihood(var[1], args[0].compact_2).log() + DirCrossEntr(var[1], args[0].K).logMetapr()
         return - LogLike
     def myjac(var, *args) :
-        jac_LogLike = np.zeros(2)
-        jac_LogLike[0] = log_alphaLikelihood_jac(var[0], args[0].compact_1)
-        jac_LogLike[0] += log_entropyMetaprior_jac(var[0], args[0].compact_1)
-        jac_LogLike[1] = log_alphaLikelihood_jac(var[1], args[0].compact_2) 
-        jac_LogLike[1] += log_crossentropyMetaprior_jac(var[1], args[0].compact_2)
-        jac_LogLike += log_divergenceMetaprior_unif_jac(var, *args)
+        jac_LogLike = DirKLdiv(var, args[0].K, args[1]).logMetapr_jac()
+        jac_LogLike[:,0] += Likelihood(var[0], args[0].compact_1).log_jac() + DirEntr(var[0], args[0].K).logMetapr_jac()
+        jac_LogLike[:,1] += Likelihood(var[1], args[0].compact_2).log_jac() + DirCrossEntr(var[1], args[0].K).logMetapr_jac()
         return - jac_LogLike
-    if USE_JAC_OPT is False : myjac = None
-    return myMinimizer( myfunc, [INIT_GUESS,INIT_GUESS], (compDiv,CUTOFFRATIO,), jac=myjac )
+    return myMinimizer( myfunc, [INIT_GUESS,INIT_GUESS], (compDiv,choice), jac=myjac )
 
 
 # -----------------------------------
@@ -284,8 +226,8 @@ def optimal_divergence_params_( compDiv ) :
 
 # -----------------------------------
 
+'''
 def optimal_simpson_param_( compExp ) :
-    '''Return NSB parameter Simpson index posterior times meta-prior.''' 
     def myfunc(var, *args) :
         alpha = var
         compExp = args[0]
@@ -296,7 +238,6 @@ def optimal_simpson_param_( compExp ) :
     return myMinimizer( myfunc, [INIT_GUESS], (compExp,) )
 
 def optimal_dirichlet_EP_param_( compDiv ) :
-    '''Return Dirchlet parameter which optimizes divergence posterior alpha=beta (~).''' 
     def myfunc( var, *args ) :
         compExp_1, compExp_2, = args[0].compact_1,  args[0].compact_2
         Like = log_alphaLikelihood(var, (compExp_1,)) + log_alphaLikelihood(var, (compExp_2,))
@@ -304,7 +245,6 @@ def optimal_dirichlet_EP_param_( compDiv ) :
     return myMinimizer( myfunc, [INIT_GUESS], (compDiv,) )
 
 def optimal_divergence_EP_param_( compDiv ) :
-    '''Return Dirchlet parameter which optimizes divergence posterior alpha=beta (~).''' 
     def myfunc( var, *args ) :
         compExp_1, compExp_2, = args[0].compact_1,  args[0].compact_2
         K = args[0].K
@@ -312,3 +252,4 @@ def optimal_divergence_EP_param_( compDiv ) :
         Like = log_alphaLikelihood(var, (compExp_1,)) + log_alphaLikelihood(var, (compExp_2,)) + logMetaprior
         return - Like
     return myMinimizer( myfunc, [INIT_GUESS], (compDiv,) )
+'''
