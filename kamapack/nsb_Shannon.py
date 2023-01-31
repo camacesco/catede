@@ -11,24 +11,33 @@ from mpmath import mp
 import multiprocessing
 from tqdm import tqdm
 
-from .new_calculus import optimal_entropy_param_
+from .new_calculus import *
 from .beta_func_multivar import *
 
+
 def Shannon_NSB(
-    compACTexp, error=False, n_bins=1, CPU_Count=None, verbose=False
+    compExp, error=False, n_bins="default", CPU_Count=None, verbose=False
     ):
     ''' Nemenamn-Shafee-Bialekd Shannon entropy estimator '''
     
     # >>>>>>>>>>>>>>>>>>>>>>
     #  CHECK user OPTIONS  #
     # >>>>>>>>>>>>>>>>>>>>>>
+
+    # number of categories
+    K = compExp.K
         
     # number of bins
+    if n_bins == "default" :
+        # empirical choice ~
+        n_bins = max( 1, np.round(5 * np.power(K / compExp.N, 2)) )
+        n_bins = min( n_bins, 100 ) 
     try :
         n_bins = int(n_bins)
     except :
         raise TypeError("The parameter `bins` requires an integer value.")
-    
+
+
     # number of jobs
     try :
         CPU_Count = int(CPU_Count)
@@ -38,7 +47,8 @@ def Shannon_NSB(
         CPU_Count = multiprocessing.cpu_count()
     CPU_Count = min( CPU_Count, n_bins**2 )
 
-    run_parallel = ( CPU_Count == 1 )
+    run_parallel = ( CPU_Count > 1 ) # FIXME
+    #  saddle_point_method = (n_bins < 2) # only saddle
 
     # verbose
     disable = not verbose
@@ -47,13 +57,23 @@ def Shannon_NSB(
     #  Compute Alpha  #
     # >>>>>>>>>>>>>>>>>
 
-    a_NSB_star = optimal_entropy_param_( compACTexp )
-    aux_range = np.append(
-        np.logspace( -0.25, 0, np.ceil( n_bins / 2 + 0.5 ).astype(int) )[:-1],
-        np.logspace( 0, 0.25, np.floor( n_bins / 2 + 0.5 ).astype(int) )
-        )
-    alpha_vec = a_NSB_star * aux_range
-            
+    a_star = optimal_entropy_param_( compExp )
+    hess_LogPosterior = Posterior(a_star, compExp).log_hess()
+
+    std_a = np.power( - hess_LogPosterior, -0.5 )
+    alpha_vec = np.append(
+        np.logspace( min(BOUND_DIR[0], np.log10(a_star-N_SIGMA*std_a)), np.log10(a_star), n_bins//2 )[:-1],
+        np.logspace( np.log10(a_star), np.log10(a_star+N_SIGMA*std_a), n_bins//2+1 )
+    )
+
+    #  Compute Posterior (old ``Measure Mu``) for alpha #
+    log_mu_alpha = list(map(lambda a : Posterior(a, compExp).log(), alpha_vec ))   
+    log_mu_alpha -= np.max( log_mu_alpha ) # regularization
+    mu_a = np.exp( log_mu_alpha )
+
+    # for uniform binning in prior expected entropy
+    A_vec = prior_entropy_vs_alpha_(alpha_vec, compExp.K)
+    
     # >>>>>>>>>>>>>>>>>>>>>>>
     #  estimators vs alpha  #
     # >>>>>>>>>>>>>>>>>>>>>>>
@@ -64,18 +84,18 @@ def Shannon_NSB(
     if run_parallel is True :
         POOL = multiprocessing.Pool( CPU_Count )  
         tqdm_args = tqdm( args, total=len(args), desc="Error Eval", disable=disable ) 
-        all_S1_a = POOL.map( compACTexp.entropy, tqdm_args )
+        all_S1_a = POOL.map( compExp.entropy, tqdm_args )
     else :
-        all_S1_a = [ compACTexp.entropy(args[0]) ]
+        all_S1_a = [ compExp.entropy(args[0]) ]
     all_S1_a = np.asarray(all_S1_a)
     
     # squared-entropy (a) computation
     if error is True :
         if run_parallel is True :
             tqdm_args = tqdm( args, total=len(args), desc="Error Eval", disable=disable )
-            all_S2_a = POOL.map( compACTexp.squared_entropy, tqdm_args )   
+            all_S2_a = POOL.map( compExp.squared_entropy, tqdm_args )   
         else :
-            all_S2_a = [ compACTexp.squared_entropy(args[0]) ]
+            all_S2_a = [ compExp.squared_entropy(args[0]) ]
         all_S2_a = np.asarray(all_S2_a)
         
     if run_parallel is True :
@@ -84,10 +104,6 @@ def Shannon_NSB(
     # >>>>>>>>>>>>>>>
     #   estimators  #
     # >>>>>>>>>>>>>>>
-
-    K = compACTexp.K
-    A_vec = prior_entropy_vs_alpha_( alpha_vec, K ) 
-    mu_a = np.asarray( list(map( compACTexp.alphaLikelihood,  alpha_vec )) )
         
     Zeta = integral_with_mu_(mu_a, 1., A_vec)
     S1 = mp.fdiv( integral_with_mu_(mu_a, all_S1_a, A_vec), Zeta ) 

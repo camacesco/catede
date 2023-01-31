@@ -1,0 +1,16 @@
+LICENSE
+README.md
+setup.py
+kamapack/__init__.py
+kamapack/beta_func_multivar.py
+kamapack/cmw_KL_divergence.py
+kamapack/default_divergence.py
+kamapack/default_entropy.py
+kamapack/new_calculus.py
+kamapack/nsb_entropy.py
+kamapack/shannon.py
+kamapack.egg-info/PKG-INFO
+kamapack.egg-info/SOURCES.txt
+kamapack.egg-info/dependency_links.txt
+kamapack.egg-info/requires.txt
+kamapack.egg-info/top_level.txt

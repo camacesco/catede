@@ -86,7 +86,7 @@ def switchboard( compACT, method="naive", which="Shannon", unit="default", **kwa
     elif method in ["Di", "Dirichlet"] :
         if "a" not in kwargs :
             a = "optimal"
-            warnings.warn("Dirichlet parameter `a` set to optimal.")
+            #warnings.warn("Dirichlet parameter `a` set to optimal.")
         else :
             a = kwargs['a']
         estimate = Dirichlet( compACT, a, which=which, **kwargs )       

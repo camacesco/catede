@@ -10,7 +10,8 @@ import numpy as np
 import mpmath as mp
 import pandas as pd
 import itertools
-from scipy.special import loggamma, polygamma   
+from scipy.special import loggamma, polygamma
+from scipy.special import beta as beta_func   
 
 class Experiment_Compact :
     def __init__( self, source=None, is_div=None, is_comp=False, load=None ) :
@@ -299,6 +300,10 @@ def prior_KLdivergence_( alpha, beta, K ):
 def prior_simpson_vs_alpha_( alpha, K ):
     '''Expected Simpson for Dirichlet distribution.'''
     return (alpha + 1) / (K * alpha + 1)
+
+def prior_bhattacharrya_( alpha, beta, K ) :
+    '''A priori expected Bhattacharrya under symmetricDirichlet Mixture.'''
+    return K * (beta_func(0.5,K*alpha)/beta_func(0.5,alpha)) * (beta_func(0.5,K*beta)/beta_func(0.5,beta))
 
 ####################################
 #  MULTIVARIATE BETA COMPUTATIONS  #
@@ -726,23 +731,22 @@ def post_divergence_( compDiv, a, b ):
         sum_i < q_i ln(q_i) - q_i ln(t_i) >
     '''
 
-    sumGens = shift_1_deriv_1(compDiv.compact_1, a)
-    sum_value_QlogQ = compDiv.compact_1._norm_ffsum( sumGens, a, dim=1 )
-    sumGens = Q_shift_1_T_deriv_1(compDiv, a, b)
-    sum_value_QlogT = compDiv.compact_1._norm_ffsum( sumGens, a, dim=1 )
+    sumGens_QlogQ = shift_1_deriv_1(compDiv.compact_1, a)
+    sumGens_QlogT = Q_shift_1_T_deriv_1(compDiv, a, b)
+    gens = zip( sumGens_QlogQ, sumGens_QlogT )
+    sumGens = ( QlogQ - QlogT for QlogQ, QlogT in gens )
 
-    return  sum_value_QlogQ - sum_value_QlogT
+    return  compDiv.compact_1._norm_ffsum( sumGens, a, dim=1 )
 
 def post_divergence_sqr_( compDiv, a, b ):
     '''Estimate of the squared divergence at alpha and beta.
         sum_i < q_i q_j ln(q_i) ln(q_j) > - 2 * < q_i q_j ln(q_i) ln(t_j) > + < q_i q_j ln(t_i) ln(t_j) >
     '''
 
-    sumGens = shift_2_deriv_2( compDiv.compact_1, a )
-    sum_value_Q2logQ2 = compDiv.compact_1._norm_ffsum( sumGens, a, dim=2 )
-    sumGens = Q_shift_2_deriv_1_T_deriv_1( compDiv, a, b )
-    sum_value_Q2logQlogT = compDiv.compact_1._norm_ffsum( sumGens, a, dim=2 )
-    sumGens = Q_shift_2_T_deriv_2( compDiv, a, b )
-    sum_value_Q2logT2 = compDiv.compact_1._norm_ffsum( sumGens, a, dim=2 )
+    sumGens_Q2logQ2 = shift_2_deriv_2( compDiv.compact_1, a )
+    sumGens_Q2logQlogT = Q_shift_2_deriv_1_T_deriv_1( compDiv, a, b )
+    sumGens_Q2logT2 = Q_shift_2_T_deriv_2( compDiv, a, b )
+    gens = zip( sumGens_Q2logQ2, sumGens_Q2logQlogT, sumGens_Q2logT2 )
+    sumGens = ( Q2logQ2 - 2 * Q2logQlogT + Q2logT2 for Q2logQ2, Q2logQlogT, Q2logT2 in gens )
 
-    return sum_value_Q2logQ2 - 2 * sum_value_Q2logQlogT + sum_value_Q2logT2
+    return compDiv.compact_1._norm_ffsum( sumGens, a, dim=2 )
