@@ -8,14 +8,14 @@
 
 import warnings
 import numpy as np 
-from .cmw_KullbackLeibler import Kullback_Leibler_CMW
-from .default_entropy import _unit_Dict_, Shannon_oper
-from .new_calculus import optimal_dirichlet_param_
+from .kullback_leibler_divergence import main as _DKL_estimator
+from .default_entropy import _unit_Dict_
+from .new_calculus import optimal_dirichlet_param
 from scipy.special import rel_entr
 
 _method_List_ = [
     "naive", "maximum-likelihood",
-    "CMW", "Camaglia-Mora-Walczak",
+    "CMW", "Camaglia-Mora-Walczak", # FIXME : WARNING : this needs to be changed
     "Di", "Dirichlet", 
     "Je", "Jeffreys", "Krichevsky-Trofimov", 
     "La", "Laplace", 
@@ -23,7 +23,7 @@ _method_List_ = [
     "Pe", "Perks", "SG", "Schurmann-Grassberger",
 ]
 
-_which_List_ = ["Hellinger", "Jensen-Shannon", "Kullback-Leibler"]
+_which_List_ = ["Hellinger", "Jensen-Shannon", "Kullback-Leibler", "symmetric-KL"]
 
 #############
 #  ALIASES  #
@@ -33,8 +33,12 @@ def KullbackLeibler_oper( x, y ) :
     ''' x * log(x/y) '''
     return rel_entr(x,y)
 
+def symmetric_KL_oper( x, y ) :
+    ''' 0.5 * ( x * log(x/y) + y * log(y/x)) '''
+    return 0.5 * ( rel_entr(x,y) + rel_entr(y,x) )
+
 def JensenShannon_oper( x, y ) :
-    ''' '''
+    '''   '''
     mm = 0.5 * ( x + y )
     return 0.5 * ( KullbackLeibler_oper( x, mm ) + KullbackLeibler_oper( y, mm ) )
 
@@ -53,7 +57,7 @@ def switchboard( compACT, method="naive", which="Kullback-Leibler", unit="defaul
         raise IOError("Unkown divergence. Please choose `which` amongst :", _which_List_ )
     
     # loading units
-    if which in ["Jensen-Shannon", "Kullback-Leibler"] :
+    if which in ["Jensen-Shannon", "Kullback-Leibler", "symmetric-KL"] :
         if unit not in _unit_Dict_.keys( ) :
             warnings.warn( "Please choose `unit` amongst :", _unit_Dict_.keys( ), ". Falling back to default." )
         unit_conv = _unit_Dict_.get( unit, _unit_Dict_["default"] )
@@ -68,7 +72,7 @@ def switchboard( compACT, method="naive", which="Kullback-Leibler", unit="defaul
         if which in ["Jensen-Shannon"] :
             raise IOError("Unknown method `CMW` for the chosen divergence.")
         elif which == "Kullback-Leibler" :
-            dkl_estimate = Kullback_Leibler_CMW( compACT, **kwargs )
+            dkl_estimate = _DKL_estimator( compACT, **kwargs )
         elif which == "Hellinger" :
             raise IOError("FIXME: place holder.")
 
@@ -132,6 +136,9 @@ def Naive( compACT, which="Kullback-Leibler", **kwargs) :
 
     elif which == "Kullback-Leibler" :                       
         output = np.dot( ff, KullbackLeibler_oper( hh_1, hh_2 ) )
+    
+    elif which == "symmetric-KL" :                       
+        output = np.dot( ff, symmetric_KL_oper( hh_1, hh_2 ) )
 
     elif which == "Hellinger" :  
         output = np.sqrt( 1 - np.dot( ff, Bhattacharyya_oper( hh_1, hh_2 ) ) )
@@ -146,11 +153,10 @@ def Naive( compACT, which="Kullback-Leibler", **kwargs) :
 ##########################
 
 def Dirichlet( compACT, a, b, which="Kullback-Leibler", **kwargs ):
-    '''Estimation of divergence with Dirichlet-multinomial pseudocount model.
-    '''
+    '''Estimation of divergence with Dirichlet-multinomial pseudocount model.'''
     # check options
     if a == "optimal" :
-        a = optimal_dirichlet_param_(compACT.compact_1)
+        a = optimal_dirichlet_param(compACT.compact_1)
     else :
         try:
             a = np.float64(a)
@@ -160,7 +166,7 @@ def Dirichlet( compACT, a, b, which="Kullback-Leibler", **kwargs ):
             raise IOError('The concentration parameter `a` must greater than 0.')
 
     if b == "optimal" :
-        b = optimal_dirichlet_param_(compACT.compact_2)
+        b = optimal_dirichlet_param(compACT.compact_2)
     else :
         try:
             b = np.float64(b)
@@ -181,6 +187,9 @@ def Dirichlet( compACT, a, b, which="Kullback-Leibler", **kwargs ):
 
     elif which == "Kullback-Leibler" :                               
         output = np.dot( ff, KullbackLeibler_oper( hh_1_a, hh_2_b ) )
+
+    elif which == "symmetric-KL" :                       
+        output = np.dot( ff, symmetric_KL_oper( hh_1_a, hh_2_b ) )
 
     elif which == "Hellinger" :  
         output = np.sqrt( 1 - np.dot( ff, Bhattacharyya_oper( hh_1_a, hh_2_b ) ) )

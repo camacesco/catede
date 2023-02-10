@@ -3,7 +3,7 @@
 
 '''
     Divergence Estimator (in development)
-    Copyright (C) December 2022 Francesco Camaglia, LPENS 
+    Copyright (C) February 2023 Francesco Camaglia, LPENS 
 '''
 
 import itertools
@@ -12,11 +12,11 @@ from mpmath import mp
 import multiprocessing
 from tqdm import tqdm
 from .new_calculus import *
-from .nsb_Shannon import integral_with_mu_
+from .nsb_shannon_entropy import integral_with_mu
 
-def Kullback_Leibler_CMW(
+def main(
     CompDiv, n_bins="default", error=False,
-    CPU_Count=None, verbose=False, choice="uniform",
+    CPU_Count=None, verbose=False, choice="uniform", scaling=1.
     ) :
     '''Kullback-Leibler divergence estimation with Camaglia Mora Walczak method.'''
 
@@ -49,11 +49,12 @@ def Kullback_Leibler_CMW(
         CPU_Count = multiprocessing.cpu_count()
     CPU_Count = min( CPU_Count, n_bins**2 )
 
-    # verbose
+    # verbose 
     disable = not verbose
 
     #  Find Point for Maximum Likelihood #   
-    a_star, b_star = optimal_divergence_params_( CompDiv, choice=choice )
+    a_star, b_star = optimal_KL_divergence_params( CompDiv, choice=choice, scaling=scaling )
+    # FIXME : optimal_divergence_params_ arguments are messy
 
     if saddle_point_method is True :
 
@@ -75,7 +76,7 @@ def Kullback_Leibler_CMW(
         #  PRE COMPUTATIONS  #
         # <<<<<<<<<<<<<<<<<<<<
 
-        hess_LogPosterior = log_meta_posterior_hess([a_star, b_star], CompDiv, choice)
+        hess_LogPosterior = log_meta_posterior_hess([a_star, b_star], CompDiv, choice, {"scaling" : scaling})
 
         # FIXME : this bin choice may be wrong : 
         std_a = np.power( - hess_LogPosterior[:,0,0], -0.5 )
@@ -90,10 +91,10 @@ def Kullback_Leibler_CMW(
         )
 
         #  Compute Posterior (old ``Measure Mu``) for alpha and beta #
-        log_mu_alpha = list(map(lambda a : Posterior(a, CompDiv.compact_1).log(), alpha_vec ))   
+        log_mu_alpha = list(map(lambda a : Polya(a, CompDiv.compact_1).log(), alpha_vec ))   
         log_mu_alpha -= np.max( log_mu_alpha )
         mu_alpha = np.exp( log_mu_alpha )
-        log_mu_beta = list(map(lambda b : Posterior(b, CompDiv.compact_2).log(), beta_vec )) 
+        log_mu_beta = list(map(lambda b : Polya(b, CompDiv.compact_2).log(), beta_vec )) 
         log_mu_beta -= np.max( log_mu_beta )
         mu_beta = np.exp( log_mu_beta )
 
@@ -133,16 +134,16 @@ def Kullback_Leibler_CMW(
             all_DKL2_ab_times_phi = np.multiply( all_phi, all_DKL2_ab )
             args = np.concatenate([args, all_DKL2_ab_times_phi])
 
-        integrations_a = list(map( lambda x : integral_with_mu_( mu_beta, x, beta_vec ), args ))
+        integrations_a = list(map( lambda x : integral_with_mu( mu_beta, x, beta_vec ), args ))
         integrations_a = np.asarray(  integrations_a )
-        Zeta = integral_with_mu_( mu_alpha, integrations_a[:len(alpha_vec)], alpha_vec )
-        DKL1 = integral_with_mu_( mu_alpha, integrations_a[len(alpha_vec):2*len(alpha_vec)], alpha_vec ) 
+        Zeta = integral_with_mu( mu_alpha, integrations_a[:len(alpha_vec)], alpha_vec )
+        DKL1 = integral_with_mu( mu_alpha, integrations_a[len(alpha_vec):2*len(alpha_vec)], alpha_vec ) 
         DKL1 = mp.fdiv( DKL1, Zeta )  
         
         if error is False :  
             estimate = np.array(DKL1, dtype=np.float) 
         else :
-            DKL2 = mp.fdiv( integral_with_mu_(mu_alpha, integrations_a[2*len(alpha_vec):], alpha_vec ), Zeta )  
+            DKL2 = mp.fdiv( integral_with_mu(mu_alpha, integrations_a[2*len(alpha_vec):], alpha_vec ), Zeta )  
             DKL_devStd = np.sqrt(DKL2 - np.power(DKL1, 2))  
             estimate = np.array([DKL1, DKL_devStd], dtype=np.float)   
         

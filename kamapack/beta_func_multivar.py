@@ -177,6 +177,7 @@ class Divergence_Compact :
         return post_divergence_sqr_( self, a, b )
 
     def _save( self, filename ) : 
+        # FIXME : how to implement for compression? (change also load)
         '''Save the Divergence_Compact object to `filename`.'''
         # parameters
         pd.DataFrame(
@@ -187,6 +188,7 @@ class Divergence_Compact :
         pd.DataFrame(
             { 'nn_1' : self.nn_1, 'nn_2' : self.nn_2, 'ff' : self.ff }
         ).to_csv( filename, sep=' ', mode='a', header=True, index=False )
+
 
     def _load( self, filename ) : 
         '''Load the saved Divergence_Compact object from `filename`.'''
@@ -250,7 +252,6 @@ def count_hist_sum_( ff, sumGens, dim ) :
 
     return output        
 
-
 ##############
 #  NOTATION  #
 ##############
@@ -267,6 +268,10 @@ def quadriGmm(x) :
     '''Quadrigamma function (polygamma of order 2).'''
     return polygamma(2, x)
 
+def quintiGmm(x) :    
+    '''Quintigamma function (polygamma of order 3).'''
+    return polygamma(3, x)
+
 def D_diGmm(x, y):
     '''Difference between digamma functions in `x` and `y`.'''
     return diGmm(x) - diGmm(y)  
@@ -282,28 +287,6 @@ def D_quadriGmm(x, y):
 def LogGmm( x ): 
     ''' alias of Log Gamma function'''
     return loggamma( x ).real  
-
-# PRIOR ESTIMATORS
-
-def prior_entropy_vs_alpha_( alpha, K ):
-    '''Expected Shannon entropy for Dirichlet distribution.'''
-    return D_diGmm( K * alpha + 1, alpha + 1 )
-
-def prior_crossentropy_vs_beta_( beta, K ):
-    '''Expected crossentropy for independent Dirichlet distributions.'''
-    return D_diGmm( K * beta , beta )
-
-def prior_KLdivergence_( alpha, beta, K ):
-    '''Expected crossentropy for independent Dirichlet distributions.'''
-    return prior_crossentropy_vs_beta_( beta, K ) - prior_entropy_vs_alpha_( alpha, K )
-
-def prior_simpson_vs_alpha_( alpha, K ):
-    '''Expected Simpson for Dirichlet distribution.'''
-    return (alpha + 1) / (K * alpha + 1)
-
-def prior_bhattacharrya_( alpha, beta, K ) :
-    '''A priori expected Bhattacharrya under symmetricDirichlet Mixture.'''
-    return K * (beta_func(0.5,K*alpha)/beta_func(0.5,alpha)) * (beta_func(0.5,K*beta)/beta_func(0.5,beta))
 
 ####################################
 #  MULTIVARIATE BETA COMPUTATIONS  #

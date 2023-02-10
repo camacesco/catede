@@ -39,8 +39,8 @@ class Skeleton_Class :
             else :
                 self.usr_n_categ = obs_n_categ 
                 if categories < obs_n_categ :
-                    warnings.warn("The parameter `categories` is set equal to the observed number of categories.")
-    
+                    .warn("The parameter `categories` is set equal to the observed number of categories.")
+    warnings
     def show( self ):
         '''Print a short summary.'''
         
@@ -113,6 +113,12 @@ class Experiment( Skeleton_Class ) :
         except ValueError :
             # WARNING! : this try/except doesn't looks nice
             raise ValueError("Unrecognized count value in `data`.")    
+
+        # check categories
+        try :
+            categories = int(categories)
+        except :
+            raise TypeError("The parameter `categories` must be a scalar.")
 
         self.data_hist = data_hist
         # total n. of counts
@@ -231,7 +237,7 @@ class Divergence( Skeleton_Class ) :
 
     __doc__ += Skeleton_Class.__doc__
 
-    def __init__( self, my_exp_1, my_exp_2, categories=None, ) :
+    def __init__( self, my_exp_1, my_exp_2, categories=2, ) :
         '''
         Parameters
         ----------    
@@ -320,43 +326,28 @@ class Divergence( Skeleton_Class ) :
 
         Jensen-Shannon divergence estimation through a chosen `method`.
         The unit (of the logarithm) can be specified with the parameter `unit`.
-            
-        Parameters
-        ----------
-        method: str
-            the name of the estimation method:
-            - ["naive", "maximum-likelihood"] : naive estimator (default);
-            - ["Jeffreys", "Krichevsky-Trofimov"] : Jeffreys estimator;
-            - ["L", "Laplace", "Bayesian-Laplace"] : Laplace estimator;
-            - ["SG", "Schurmann-Grassberger"] : Schurmann-Grassberger estimator;
-            - ["minimax", "Trybula"] : minimax estimator; 
-            - ["D", "Dirichlet"] : Dirichlet    
-        unit: str, optional
-            the divergence logbase unit:
-            - "ln": natural logarithm (default);
-            - "log2": base 2 logarihtm;
-            - "log10":base 10 logarithm.
 
         return numpy.array
         '''
         
         return default_divergence.switchboard( self.compact(), method=method, which="Jensen-Shannon", unit=unit, **kwargs )
 
+    def symmetric_KL( self, method="naive", unit="ln", **kwargs ):
+        '''Estimate symmetric Kullback-Leibler divergence.
+
+        Kullback-Leibler divergence estimation through a chosen `method`.
+        The unit (of the logarithm) can be specified with the parameter `unit`.
+
+        return numpy.array
+        '''
+        
+        return default_divergence.switchboard( self.compact(), method=method, which="symmetric-KL", unit=unit, **kwargs )
+
+
     def hellinger( self, method="naive", **kwargs ):
         '''Estimate Hellinger divergence.
 
         Hellinger divergence estimation through a chosen `method`.
-            
-        Parameters
-        ----------
-        method: str
-            the name of the estimation method:
-            - ["naive", "maximum-likelihood"] : naive estimator (default);
-            - ["Jeffreys", "Krichevsky-Trofimov"] : Jeffreys estimator;
-            - ["L", "Laplace", "Bayesian-Laplace"] : Laplace estimator;
-            - ["SG", "Schurmann-Grassberger"] : Schurmann-Grassberger estimator;
-            - ["minimax", "Trybula"] : minimax estimator; 
-            - ["D", "Dirichlet"] : Dirichlet    
 
         return numpy.array
         '''
@@ -371,10 +362,29 @@ class Divergence( Skeleton_Class ) :
     def compact( self ) :
         '''It provides aliases for computations.'''
         return Divergence_Compact( self )
+
+
+    def save( self, filename, compression="gzip" ) : 
+        '''Save the Divergence object to `filename`.'''
+        outFrame = self.data_hist.copy()
+        add_ons = pd.Series(
+            {"Exp-1" : self.exp_1.usr_n_categ, "Exp-2" : self.exp_2.usr_n_categ}, 
+            name="__usr_n_categ__"
+            )
+        outFrame = outFrame.append( add_ons )
+        outFrame.to_csv( filename, sep=' ', mode='w', header=True, index=True, compression=compression )
         
     def save_compact( self, filename ) :
-        '''It saves the compact version of Experiment to `filename`.'''
+        '''It saves the compact version of Divergence to `filename`.'''
         self.compact( )._save( filename )
+
+def load_diver( filename ) :
+    '''  Load the Divergence object stored in `filename`. '''
+    df = pd.read_csv( filename, sep=" ", index_col=0, compression="infer" )
+    this_categories = df.loc["__usr_n_categ__"].max()
+    df = df.drop(index=["__usr_n_categ__"])
+    Div = Divergence( df["Exp-1"], df["Exp-2"], categories=this_categories )
+    return Div
 
 # >>>>>>>>>>>>
 #  GRAPHICS  #

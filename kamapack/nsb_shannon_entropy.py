@@ -3,7 +3,11 @@
 
 '''
     Nemenmann-Shafee-Bialek Estimator
-    Copyright (C) August 2022 Francesco Camaglia, LPENS 
+    Copyright (C) February 2023 Francesco Camaglia, LPENS 
+
+    ref: 
+    Ilya Nemenman, F. Shafee, and William Bialek. Entropy and Inference, Revisited. 
+    Advances in Neural Infor- mation Processing Systems, volume 14. MIT Press, 2001.
 '''
 
 import numpy as np
@@ -15,19 +19,19 @@ from .new_calculus import *
 from .beta_func_multivar import *
 
 
-def Shannon_NSB(
+def main(
     compExp, error=False, n_bins="default", CPU_Count=None, verbose=False
     ):
-    ''' Nemenamn-Shafee-Bialekd Shannon entropy estimator '''
+    ''' Nemenman-Shafee-Bialek estimator for Shannon entropy.'''
     
     # >>>>>>>>>>>>>>>>>>>>>>
     #  CHECK user OPTIONS  #
     # >>>>>>>>>>>>>>>>>>>>>>
 
-    # number of categories
+    # number of categories #
     K = compExp.K
         
-    # number of bins
+    # number of bins #
     if n_bins == "default" :
         # empirical choice ~
         n_bins = max( 1, np.round(5 * np.power(K / compExp.N, 2)) )
@@ -37,8 +41,7 @@ def Shannon_NSB(
     except :
         raise TypeError("The parameter `bins` requires an integer value.")
 
-
-    # number of jobs
+    # number of jobs #
     try :
         CPU_Count = int(CPU_Count)
         if CPU_Count < 1 :
@@ -48,18 +51,17 @@ def Shannon_NSB(
     CPU_Count = min( CPU_Count, n_bins**2 )
 
     run_parallel = ( CPU_Count > 1 ) # FIXME
-    #  saddle_point_method = (n_bins < 2) # only saddle
+    #  saddle_point_method = (n_bins < 2) # only saddle # FIXME
 
-    # verbose
+    # verbose #
     disable = not verbose
 
     # >>>>>>>>>>>>>>>>>
     #  Compute Alpha  #
     # >>>>>>>>>>>>>>>>>
 
-    a_star = optimal_entropy_param_( compExp )
-    hess_LogPosterior = Posterior(a_star, compExp).log_hess()
-
+    a_star = optimal_entropy_param( compExp )
+    hess_LogPosterior = Polya(a_star, compExp).log_hess() + DirEntr(a_star, K).logMetapr_hess()
     std_a = np.power( - hess_LogPosterior, -0.5 )
     alpha_vec = np.append(
         np.logspace( min(BOUND_DIR[0], np.log10(a_star-N_SIGMA*std_a)), np.log10(a_star), n_bins//2 )[:-1],
@@ -67,7 +69,7 @@ def Shannon_NSB(
     )
 
     #  Compute Posterior (old ``Measure Mu``) for alpha #
-    log_mu_alpha = list(map(lambda a : Posterior(a, compExp).log(), alpha_vec ))   
+    log_mu_alpha = list(map(lambda a : Polya(a, compExp).log(), alpha_vec ))   
     log_mu_alpha -= np.max( log_mu_alpha ) # regularization
     mu_a = np.exp( log_mu_alpha )
 
@@ -105,19 +107,22 @@ def Shannon_NSB(
     #   estimators  #
     # >>>>>>>>>>>>>>>
         
-    Zeta = integral_with_mu_(mu_a, 1., A_vec)
-    S1 = mp.fdiv( integral_with_mu_(mu_a, all_S1_a, A_vec), Zeta ) 
+    Zeta = integral_with_mu(mu_a, 1., A_vec)
+    S1 = mp.fdiv( integral_with_mu(mu_a, all_S1_a, A_vec), Zeta ) 
     if error is False :       
         estimate = np.array(S1, dtype=np.float) 
     else :
-        S2 = mp.fdiv( integral_with_mu_(mu_a, all_S2_a, A_vec), Zeta )
+        S2 = mp.fdiv( integral_with_mu(mu_a, all_S2_a, A_vec), Zeta )
         S_devStd = np.sqrt(S2 - np.power(S1, 2))
         estimate = np.array([S1, S_devStd], dtype=np.float)   
         
     return estimate
 
-def integral_with_mu_( m, y, x ) :
-    # alias for trapz integration
-    if len(x) == 1 : output = np.multiply(m, y)[0]
-    else : output = np.trapz( np.multiply(m, y), x=x )
+# FIXME : this function here is not elegant...
+def integral_with_mu( m, y, x ) :
+    '''alias for trapz integration.'''
+    if len(x) == 1 : 
+        output = np.multiply(m, y)[0]
+    else : 
+        output = np.trapz( np.multiply(m, y), x=x )
     return output

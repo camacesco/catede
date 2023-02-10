@@ -3,4 +3,4 @@ pandas
 scipy
 mpmath
 tqdm
-joblib
+matplotlib

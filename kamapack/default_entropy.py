@@ -9,8 +9,8 @@
 
 import numpy as np
 from scipy.special import comb, entr
-from .new_calculus import optimal_dirichlet_param_
-from .nsb_Shannon import Shannon_NSB
+from .new_calculus import optimal_dirichlet_param
+from .nsb_shannon_entropy import main as _Shannon_est
 #from .nsb_Simpson import Simpson_NSB # FLAG 
 import warnings 
 
@@ -71,7 +71,7 @@ def switchboard( compACT, method="naive", which="Shannon", unit="default", **kwa
         
     elif method in ["NSB", "Nemenman-Shafee-Bialek"]:   
         if which == "Shannon" :
-            estimate = Shannon_NSB( compACT, **kwargs )
+            estimate = _Shannon_est( compACT, **kwargs )
         #elif which == "Simpson" :
         #    estimate = Simpson_NSB( compACT, **kwargs )
         else :
@@ -213,7 +213,7 @@ def Dirichlet( compACT, a, which="Shannon", ):
     nn, ff = compACT.nn, compACT.ff
 
     if a == "optimal" :
-        a = optimal_dirichlet_param_(compACT)
+        a = optimal_dirichlet_param(compACT)
     else :
         try:
             a = np.float64(a)

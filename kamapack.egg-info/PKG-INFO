@@ -1,16 +1,13 @@
 Metadata-Version: 2.1
 Name: kamapack
-Version: 0.0.19
-Summary: Python package for entropy and KL divergence estimation.
+Version: 0.0.20
+Summary: Python package for entropy and divergence estimation.
 Home-page: https://github.com/camacesco/kamapack
 Author: Francesco Camaglia
 Author-email: francesco.camaglia@phys.ens.fr
 License: GNU GPLv3
+Description: # kamapack
+        
 Platform: UNKNOWN
 Requires-Python: >=3.5
 Description-Content-Type: text/markdown
-License-File: LICENSE
-
-# kamapack
-
-
