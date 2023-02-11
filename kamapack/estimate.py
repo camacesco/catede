@@ -39,8 +39,8 @@ class Skeleton_Class :
             else :
                 self.usr_n_categ = obs_n_categ 
                 if categories < obs_n_categ :
-                    .warn("The parameter `categories` is set equal to the observed number of categories.")
-    warnings
+                    warnings.warn("The parameter `categories` is set equal to the observed number of categories.")
+    
     def show( self ):
         '''Print a short summary.'''
         

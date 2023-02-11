@@ -166,7 +166,7 @@ class _two_dim_metapr( ) :
             for extra in _PRIOR_CHOICE[self.choice]["extra"] :
                 self._extra[extra] = kwargs.get(extra, 1.)
             # Known controls
-            if "scaling" in _PRIOR_CHOICE[self.choice]["extra"] :    
+            if ("scaling" in kwargs) and ("scaling" in _PRIOR_CHOICE[self.choice]["extra"]) :    
                 try :
                     self._extra["scaling"] = np.float64(kwargs["scaling"])
                     if self._extra["scaling"] <= 0. :
@@ -186,7 +186,7 @@ class _two_dim_metapr( ) :
         return output
 
     def log_divPrior( self, output ) :
-        '''It returns the logarithm of the prior, log rho(D).'''
+        '''It returns the logarithm of the D prior, log rho(D).'''
         if self.choice in ["scaled"] :
             output += - self._extra["scaling"] * ( self.D / self.class_A.aPrioriExpec() )
         elif self.choice in ["uniform"] :
@@ -197,6 +197,7 @@ class _two_dim_metapr( ) :
         return output
 
     def log_divPrior_jac( self, output ) :
+        '''It returns the gradient of the logarithm of the D prior,.'''
         if self.choice in ["scaled"] :
             A = self.class_A.aPrioriExpec()
             B = self.class_B.aPrioriExpec()
@@ -212,6 +213,7 @@ class _two_dim_metapr( ) :
         return output
 
     def log_divPrior_hess( self, output ) :
+        '''It returns the Hessian of the logarithm of the D prior,.'''
         if self.choice in ["scaled"] :
             A = self.class_A.aPrioriExpec()
             B = self.class_B.aPrioriExpec()
@@ -233,17 +235,21 @@ class _two_dim_metapr( ) :
         return output
 
     def Metapr( self ) :
+        ''' Complete Metaprior '''
         output = self.marginaliz_phi( _PRIOR_CHOICE[self.choice]["use_phi"] )
         output = self.divPrior( output )
+        output *= self.class_A.Metapr() * self.class_B.Metapr()
         return output
 
     def logMetapr( self ) :
+        ''' logarithm of Metaprior '''
         output = self.log_marginaliz_phi( _PRIOR_CHOICE[self.choice]["use_phi"] )
         output = self.log_divPrior( output )
         output += self.class_A.logMetapr() + self.class_B.logMetapr()
         return output
 
     def logMetapr_jac( self ) :
+        ''' Gradient of the logarihtm of Metaprior '''
         output = self.log_marginaliz_phi_jac( _PRIOR_CHOICE[self.choice]["use_phi"] )
         output = self.log_divPrior_jac( output )
         output[:,0] += self.class_A.logMetapr_jac()
@@ -251,6 +257,7 @@ class _two_dim_metapr( ) :
         return output
 
     def logMetapr_hess( self ) :
+        ''' Hessian of the logarihtm of Metaprior '''
         output = self.log_marginaliz_phi_hess( _PRIOR_CHOICE[self.choice]["use_phi"] )
         output = self.log_divPrior_hess( output )
         output[:,0,0] += self.class_A.logMetapr_hess()
@@ -355,6 +362,20 @@ def optimal_crossentropy_param( compExp ) :
         return - jac_LogLike
     return myMinimizer( myfunc, [INIT_GUESS], (compExp,), jac=myjac )
 
+def optimal_equal_KLdiv_param( compDiv ) :
+    '''.''' 
+    def myfunc(var, *args) :
+        LogLike = equalDirKLdiv(var, args[0].K).logMetapr()
+        LogLike += Polya(var, args[0].compact_1).log()
+        LogLike += Polya(var, args[0].compact_2).log()
+        return - LogLike
+    def myjac(var, *args) :
+        jac_LogLike = equalDirKLdiv(var, args[0].K).logMetapr_jac()
+        jac_LogLike += Polya(var, args[0].compact_1).log_jac()
+        jac_LogLike += Polya(var, args[0].compact_2).log_jac()
+        return - jac_LogLike
+    return myMinimizer( myfunc, [INIT_GUESS], (compDiv,), jac=myjac )
+
 def optimal_KL_divergence_params( compDiv, choice="log-uniform", **kwargs ) :
     '''.'''
     def myfunc(var, *args) :
@@ -373,7 +394,22 @@ def optimal_KL_divergence_params( compDiv, choice="log-uniform", **kwargs ) :
 #   POSTERIOR STANDARD DEVIATION  #
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-def log_meta_posterior_hess( var, *args ) :
+def centered_logspaced_binning( loc, std, n_bins ) :
+    '''.'''
+    output = np.append(
+        np.logspace( min(BOUND_DIR[0], np.log10(loc-N_SIGMA*std)), np.log10(loc), n_bins//2 )[:-1],
+        np.logspace( np.log10(loc), np.log10(loc+N_SIGMA*std), n_bins//2+1 )
+        )
+    return output
+
+def log_equal_KLdiv_meta_posterior_hess( var, *args ) :
+    '''.'''
+    hess_LogLike = equalDirKLdiv(var, args[0].K).logMetapr_hess()
+    hess_LogLike += Polya(var, args[0].compact_1).log_hess() 
+    hess_LogLike += Polya(var, args[0].compact_2).log_hess() 
+    return hess_LogLike
+
+def log_KL_divergence_meta_posterior_hess( var, *args ) :
     '''.'''
     hess_LogLike = DirKLdiv(var, args[0].K, args[1], ** args[2] ).logMetapr_hess()
     hess_LogLike[:,0,0] += Polya(var[0], args[0].compact_1).log_hess()

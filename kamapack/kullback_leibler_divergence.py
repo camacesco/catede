@@ -12,11 +12,11 @@ from mpmath import mp
 import multiprocessing
 from tqdm import tqdm
 from .new_calculus import *
-from .nsb_shannon_entropy import integral_with_mu
 
 def main(
-    CompDiv, n_bins="default", error=False,
-    CPU_Count=None, verbose=False, choice="uniform", scaling=1.
+    CompDiv, error=False, n_bins="default", equal_prior=False,
+    choice="uniform", scaling=1.,
+    CPU_Count=None, verbose=False, 
     ) :
     '''Kullback-Leibler divergence estimation with Camaglia Mora Walczak method.'''
 
@@ -53,8 +53,10 @@ def main(
     disable = not verbose
 
     #  Find Point for Maximum Likelihood #   
-    a_star, b_star = optimal_KL_divergence_params( CompDiv, choice=choice, scaling=scaling )
-    # FIXME : optimal_divergence_params_ arguments are messy
+    if equal_prior is True :
+        a_star = optimal_equal_KLdiv_param( CompDiv )
+    else :
+        a_star, b_star = optimal_KL_divergence_params( CompDiv, choice=choice, scaling=scaling )
 
     if saddle_point_method is True :
 
@@ -62,62 +64,74 @@ def main(
         #  SADDLE POINT METHOD  #
         # <<<<<<<<<<<<<<<<<<<<<<<
 
-        DKL1_star = CompDiv.divergence( a_star, b_star )
-        if error is True :
-            DKL2_star = CompDiv.squared_divergence( a_star, b_star )
-            DKL_StdDev_star = np. sqrt(DKL2_star - np.power(DKL1_star, 2))  
-            estimate = np.array([DKL1_star, DKL_StdDev_star], dtype=np.float64) 
+        if equal_prior is True :
+            DKL1= CompDiv.divergence( a_star, a_star )
+            if error is True :
+                DKL2 = CompDiv.squared_divergence( a_star, a_star )
         else :
-            estimate = np.array([DKL1_star], dtype=np.float64) 
-
+            DKL1= CompDiv.divergence( a_star, b_star )
+            if error is True :
+                DKL2 = CompDiv.squared_divergence( a_star, b_star )
     else :    
 
         # >>>>>>>>>>>>>>>>>>>>
         #  PRE COMPUTATIONS  #
         # <<<<<<<<<<<<<<<<<<<<
 
-        hess_LogPosterior = log_meta_posterior_hess([a_star, b_star], CompDiv, choice, {"scaling" : scaling})
+        if equal_prior is True :
+            hess_LogPosterior = log_equal_KLdiv_meta_posterior_hess(a_star, CompDiv)
+            std_a = np.power( - hess_LogPosterior, -0.5 )
+            # alpha
+            alpha_vec = centered_logspaced_binning( a_star, std_a, n_bins )
+            log_mu_alpha = list(map(lambda a : Polya(a, CompDiv.compact_1).log() + Polya(a, CompDiv.compact_2).log(), alpha_vec ))   
+            log_mu_alpha -= np.max( log_mu_alpha ) # regularization
+            mu_alpha = np.exp( log_mu_alpha )
 
-        # FIXME : this bin choice may be wrong : 
-        std_a = np.power( - hess_LogPosterior[:,0,0], -0.5 )
-        alpha_vec = np.append(
-            np.logspace( min(BOUND_DIR[0], np.log10(a_star-N_SIGMA*std_a)), np.log10(a_star), n_bins//2 )[:-1],
-            np.logspace( np.log10(a_star), np.log10(a_star+N_SIGMA*std_a), n_bins//2+1 )
-        )
-        std_b = np.power( - hess_LogPosterior[:,1,1], -0.5 )
-        beta_vec = np.append(
-            np.logspace( min(BOUND_DIR[0], np.log10(b_star-N_SIGMA*std_b)), np.log10(b_star), n_bins//2 )[:-1],
-            np.logspace( np.log10(b_star), np.log10(b_star+N_SIGMA*std_b), n_bins//2+1 )
-        )
-
-        #  Compute Posterior (old ``Measure Mu``) for alpha and beta #
-        log_mu_alpha = list(map(lambda a : Polya(a, CompDiv.compact_1).log(), alpha_vec ))   
-        log_mu_alpha -= np.max( log_mu_alpha )
-        mu_alpha = np.exp( log_mu_alpha )
-        log_mu_beta = list(map(lambda b : Polya(b, CompDiv.compact_2).log(), beta_vec )) 
-        log_mu_beta -= np.max( log_mu_beta )
-        mu_beta = np.exp( log_mu_beta )
+        else :
+            hess_LogPosterior = log_KL_divergence_meta_posterior_hess([a_star, b_star], CompDiv, choice, {"scaling" : scaling})
+            std_a = np.power( - hess_LogPosterior[:,0,0], -0.5 )
+            std_b = np.power( - hess_LogPosterior[:,1,1], -0.5 )
+            # alpha
+            alpha_vec = centered_logspaced_binning( a_star, std_a, n_bins )
+            log_mu_alpha = list(map(lambda a : Polya(a, CompDiv.compact_1).log(), alpha_vec ))   
+            log_mu_alpha -= np.max( log_mu_alpha ) # regularization
+            mu_alpha = np.exp( log_mu_alpha )
+            # beta
+            beta_vec = centered_logspaced_binning( b_star, std_b, n_bins )
+            log_mu_beta = list(map(lambda b : Polya(b, CompDiv.compact_2).log(), beta_vec )) 
+            log_mu_beta -= np.max( log_mu_beta ) # regularization
+            mu_beta = np.exp( log_mu_beta )
 
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         #  DKL estimator vs alpha,beta  #
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
         # FIXME : parallelization is weak...
-        
-        args = [ x for x in itertools.product(alpha_vec, beta_vec) ]
         POOL = multiprocessing.Pool( CPU_Count ) 
-        tqdm_args = tqdm(args, total=len(args), desc='Evaluations...', disable=disable)
-        all_DKL_ab = POOL.starmap( CompDiv.divergence, tqdm_args )
-        all_DKL_ab = np.asarray( all_DKL_ab ).reshape(len(alpha_vec), len(beta_vec))
+
+        if equal_prior is True :
+            args = [ x for x in zip(alpha_vec, alpha_vec) ]
+            tqdm_args = tqdm(args, total=len(args), desc='Evaluations...', disable=disable)
+            all_DKL_a = POOL.starmap( CompDiv.divergence, tqdm_args )
+
+        else :
+            args = [ x for x in itertools.product(alpha_vec, beta_vec) ]
+            tqdm_args = tqdm(args, total=len(args), desc='Evaluations...', disable=disable)
+            all_DKL_ab = POOL.starmap( CompDiv.divergence, tqdm_args )
+            all_DKL_ab = np.asarray( all_DKL_ab ).reshape(len(alpha_vec), len(beta_vec))
     
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         #  DKL2 estimator vs alpha,beta  #
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
             
         if error is True :
-            tqdm_args = tqdm(args, total=len(args), desc='Squared', disable=disable)
-            all_DKL2_ab = POOL.starmap( CompDiv.squared_divergence, tqdm_args )
-            all_DKL2_ab = np.asarray( all_DKL2_ab ).reshape(len(alpha_vec), len(beta_vec))
+            if equal_prior is True :
+                tqdm_args = tqdm(args, total=len(args), desc='Squared', disable=disable)
+                all_DKL2_a = POOL.starmap( CompDiv.squared_divergence, tqdm_args )
+            else :
+                tqdm_args = tqdm(args, total=len(args), desc='Squared', disable=disable)
+                all_DKL2_ab = POOL.starmap( CompDiv.squared_divergence, tqdm_args )
+                all_DKL2_ab = np.asarray( all_DKL2_ab ).reshape(len(alpha_vec), len(beta_vec))
         
         POOL.close()
 
@@ -125,26 +139,40 @@ def main(
         #   integrations  #
         # >>>>>>>>>>>>>>>>>
 
-        #  Compute MetaPrior_DKL   #
-        X, Y = np.meshgrid(alpha_vec, beta_vec)
-        all_phi = DirKLdiv( [X, Y], K, choice ).Metapr().reshape(len(alpha_vec), len(beta_vec))
-        all_DKL_ab_times_phi = np.multiply( all_phi, all_DKL_ab )
-        args = np.concatenate([all_phi, all_DKL_ab_times_phi])
-        if error is True :
-            all_DKL2_ab_times_phi = np.multiply( all_phi, all_DKL2_ab )
-            args = np.concatenate([args, all_DKL2_ab_times_phi])
+        if equal_prior is True :
+            # for uniform binning in prior expected divergence
+            A_vec = equalDirKLdiv( alpha_vec, CompDiv.K ).aPrioriExpec()
+            Zeta = np.trapz( mu_alpha, x=A_vec )
+            DKL1 = mp.fdiv( np.trapz( np.multiply( mu_alpha, all_DKL_a), x=A_vec ), Zeta ) 
 
-        integrations_a = list(map( lambda x : integral_with_mu( mu_beta, x, beta_vec ), args ))
-        integrations_a = np.asarray(  integrations_a )
-        Zeta = integral_with_mu( mu_alpha, integrations_a[:len(alpha_vec)], alpha_vec )
-        DKL1 = integral_with_mu( mu_alpha, integrations_a[len(alpha_vec):2*len(alpha_vec)], alpha_vec ) 
-        DKL1 = mp.fdiv( DKL1, Zeta )  
-        
-        if error is False :  
-            estimate = np.array(DKL1, dtype=np.float) 
+            if error is True :      
+                DKL2 = mp.fdiv( np.trapz( np.multiply( mu_alpha, all_DKL2_a ), x=A_vec ), Zeta ) 
+
         else :
-            DKL2 = mp.fdiv( integral_with_mu(mu_alpha, integrations_a[2*len(alpha_vec):], alpha_vec ), Zeta )  
-            DKL_devStd = np.sqrt(DKL2 - np.power(DKL1, 2))  
-            estimate = np.array([DKL1, DKL_devStd], dtype=np.float)   
+            #  Compute MetaPrior_DKL   #
+            X, Y = np.meshgrid(alpha_vec, beta_vec)
+            all_phi = DirKLdiv( [X, Y], K, choice ).Metapr().reshape(len(alpha_vec), len(beta_vec))
+            all_DKL_ab_times_phi = np.multiply( all_phi, all_DKL_ab )
+            args = np.concatenate([all_phi, all_DKL_ab_times_phi])
+            # FIXME : maybe it's better to rewrite for it to be clearer and collapse to equal_prior
+            if error is True :
+                all_DKL2_ab_times_phi = np.multiply( all_phi, all_DKL2_ab )
+                args = np.concatenate([args, all_DKL2_ab_times_phi])
+            integr_a = list(map( lambda i : np.trapz( np.multiply(mu_beta, i), x=beta_vec ), args ))
+            integr_a = np.asarray(  integr_a )
+            Zeta = np.trapz( np.multiply(mu_alpha, integr_a[:len(alpha_vec)]), x=alpha_vec )
+            DKL1 = np.trapz( np.multiply(mu_alpha, integr_a[len(alpha_vec):2*len(alpha_vec)]), x=alpha_vec ) 
+            DKL1 = mp.fdiv( DKL1, Zeta )  
+            
+            if error is True :  
+                DKL2 = mp.fdiv( np.trapz(np.multiply(mu_alpha, integr_a[2*len(alpha_vec):]), x=alpha_vec ), Zeta )  
+        ####
+    ####
+    
+    if error is True :
+        DKL_devStd = np.sqrt( DKL2 - np.power(DKL1, 2) )  
+        estimate = np.array( [DKL1, DKL_devStd], dtype=np.float )   
+    else :
+        estimate = np.array( DKL1, dtype=np.float ) 
         
     return estimate
