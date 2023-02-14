@@ -2,95 +2,142 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) January 2022 Francesco Camaglia, LPENS 
+    Copyright (C) February 2023 Francesco Camaglia, LPENS 
+
     Following the architecture of J. Hausser and K. Strimmer : 
     https://strimmerlab.github.io/software/entropy/  
 '''
 
 import numpy as np
-from scipy.special import comb
-from . import nsb_entropy
-from ._wolpert_wolf_calculus import optimal_dirichlet_param_
-from ._aux_shannon import _unit_Dict_
+from scipy.special import comb, entr
+from .new_calculus import optimal_dirichlet_param
+from .nsb_shannon_entropy import main as _Shannon_est
+from .nsb_simpson_index import main as _Simpson_est
+import warnings 
 
 _method_List_ = [
     "naive", "maximum-likelihood",
-    "NSB",
-    "D", "Dirichlet", 
-    "J", "Jeffreys", "Krichevsky-Trofimov", 
+    "NSB", "Nemenmann-Shafee-Bialek",
+    "CS", "Chao-Shen", "CAE",
+    "Di", "Dirichlet", 
+    "Je", "Jeffreys", "Krichevsky-Trofimov", 
     "MM", "Miller-Madow", 
-    "L", "Laplace", 
-    "mm", "minimax", "Trybula", 
-    "SG", "Schurmann-Grassberger",
+    "La", "Laplace", 
+    "Tr", "minimax", "Trybula", 
+    "Pe", "Schurmann-Grassberger", "Perks",
 ]
+
+_which_List_ = ["Shannon", "Simpson"]
+
+# unit of the logarithm
+_unit_Dict_ = {
+    "n": 1., "ln": 1., "default": 1.,
+    "2": 1./np.log(2), "log2": 1./np.log(2),
+    "10": 1./np.log(10), "log10": 1./np.log(10),
+}
+
+#############
+#  ALIASES  #
+#############
+
+def Shannon_oper( x, y=None ) :
+    ''' - x * log( x ) '''
+    return entr(x)
+
+def Simpson_oper( x ) :
+    ''' x^2 '''
+    return np.power(x,2)
 
 #################
 #  SWITCHBOARD  #
 #################
 
-def switchboard( compACT, method="naive", unit=None, **kwargs ):
+def switchboard( compExp, method="naive", which="Shannon", unit="default", **kwargs ):
+    ''''''
+
+    # check which 
+    if which not in _which_List_ :
+        raise IOError("Unkown divergence. Please choose `which` amongst :", _which_List_ )
 
     # loading units
-    if unit in _unit_Dict_.keys( ) :
-        unit_conv = _unit_Dict_[ unit ]
-    else:
-        raise IOError("Unknown unit, please choose amongst ", _unit_Dict_.keys( ) )
+    if which in ["Shannon"] :
+        if unit not in _unit_Dict_.keys( ) :
+            warnings.warn( "Please choose `unit` amongst :", _unit_Dict_.keys( ), ". Falling back to default." )
+        unit_conv = _unit_Dict_.get( unit, _unit_Dict_["default"] )
+    else :
+        unit_conv = 1
 
     # choosing entropy estimation method
     if method in ["naive", "maximum-likelihood"] :    
-        shannon_estimate = Naive( compACT )
+        estimate = Naive( compExp, which=which, **kwargs )
         
     elif method in ["NSB", "Nemenman-Shafee-Bialek"]:   
-        shannon_estimate = nsb_entropy.NemenmanShafeeBialek( compACT, **kwargs )
+        if which == "Shannon" :
+            estimate = _Shannon_est( compExp, **kwargs )
+        elif which == "Simpson" :
+            estimate = _Simpson_est( compExp, **kwargs )
+        else :
+            raise IOError("FIXME: place holder.")
         
     elif method in ["MM", "Miller-Madow"]:  
-        shannon_estimate = MillerMadow( compACT )
+        estimate = MillerMadow( compExp, which=which, **kwargs )
         
-    elif method in ["CS", "Chao-Shen"] :        
-        shannon_estimate = ChaoShen( compACT )
+    elif method in ["CS", "CAE", "Chao-Shen"] :        
+        estimate = ChaoShen( compExp, which=which, **kwargs )
  
-    elif method in ["D", "Dirichlet"] :
+    elif method in ["Di", "Dirichlet"] :
         if "a" not in kwargs :
-            raise IOError("The Dirichlet parameter `a` must be specified.")
-        a = kwargs['a']
-        shannon_estimate = Dirichlet( compACT, a )       
+            a = "optimal"
+            #warnings.warn("Dirichlet parameter `a` set to optimal.")
+        else :
+            a = kwargs['a']
+        estimate = Dirichlet( compExp, a, which=which, **kwargs )       
         
-    elif method in ["L", "Laplace", "Bayesian-Laplace"] :
+    elif method in ["La", "Laplace", "Bayesian-Laplace"] :
         a = 1.
-        shannon_estimate = Dirichlet( compACT, a )
+        estimate = Dirichlet( compExp, a, which=which, **kwargs )
 
-    elif method in ["J", "Jeffreys", "Krichevsky-Trofimov"] :
+    elif method in ["Je", "Jeffreys", "Krichevsky-Trofimov"] :
         a = 0.5
-        shannon_estimate = Dirichlet( compACT, a )
+        estimate = Dirichlet( compExp, a, which=which, **kwargs )
 
-    elif method in ["SG", "Schurmann-Grassberger"]:
-        a = 1. / compACT.Kobs
-        shannon_estimate = Dirichlet( compACT, a )
+    elif method in ["Pe", "Perks", "SG", "Schurmann-Grassberger"]:
+        a = 1. / compExp.Kobs
+        estimate = Dirichlet( compExp, a, which=which, **kwargs )
         
-    elif method in ["mm", "minimax", "Trybula"]:
-        # FIXME: warning
-        a = np.sqrt( compACT.N ) / compACT.K
-        shannon_estimate = Dirichlet( compACT, a )
+    elif method in ["Tr", "Trybula", "mm", "minimax"]:
+        a = np.sqrt( compExp.N ) / compExp.K
+        estimate = Dirichlet( compExp, a, which=which, **kwargs )
 
     else:
         raise IOError("Unkown method. Please choose `method` amongst :", _method_List_ )
 
-    return unit_conv * shannon_estimate
+    return unit_conv * estimate
 ###
 
 #####################
 #  NAIVE ESTIMATOR  #
 #####################
 
-def Naive( compACT ):
+def Naive( compExp, which ):
     '''Entropy estimation (naive).'''
 
-    # loading parameters from compACT 
-    N, nn, ff = compACT.N, compACT.nn, compACT.ff
+    # loading parameters from compExp 
+    N, nn, ff = compExp.N, compExp.nn, compExp.ff
     # delete 0 counts (if present they are at position 0)
-    if 0 in nn : nn, ff = nn[1:], ff[1:]                      
-    
-    output = np.log(N) - np.dot( ff , np.multiply( nn, np.log(nn) ) ) / N
+    if 0 in nn : nn, ff = nn[1:], ff[1:]         
+
+    hh = nn / N
+
+    if which == "Shannon" :
+        output = np.dot( ff , Shannon_oper( hh ) )
+
+    elif which == "Simpson" :
+        output = np.dot( ff , Simpson_oper( hh ) )
+
+    else :
+        raise IOError("FIXME: place holder.")
+
     return np.array( output )
 ###
 
@@ -98,13 +145,23 @@ def Naive( compACT ):
 #  MILLER MADOW ESTIMATOR  #
 ############################
 
-def MillerMadow( compACT ): 
-    '''Entropy estimation with Miller-Madow pseudocount model.'''
+def MillerMadow( compExp, which, ): 
+    '''Entropy estimation with Miller-Madow pseudocount model.
     
-    # loading parameters from compACT 
-    N, Kobs = compACT.N, compACT.Kobs
+    ref:
+    Miller, G. Note on the bias of information estimates. 
+    Information Theory in Psychology: Problems and Methods, 95-100 (1955). '''
 
-    output = Naive( compACT ) + 0.5 * ( Kobs - 1 ) / N
+    
+    # loading parameters from compExp 
+    N, Kobs = compExp.N, compExp.Kobs
+
+    if which == "Shannon" :
+        output = Naive( compExp, which="Shannon" ) + 0.5 * ( Kobs - 1 ) / N
+
+    else :
+        raise IOError("FIXME: place holder.")
+
     return np.array( output )
 ###
 
@@ -112,35 +169,51 @@ def MillerMadow( compACT ):
 #  CHAO SHEN ESTIMATOR  #
 #########################
 
-def ChaoShen( compACT ):
-    '''Entropy estimation with Chao-Shen pseudocount model.'''
+def _GoodTuring_coverage( nn, ff ) :
+    '''Good-Turing frequency estimation with Zhang-Huang formulation.'''
 
-    def __coverage( nn, ff ) :
-        '''Good-Turing frequency estimation with Zhang-Huang formulation.'''
+    N = np.dot( nn, ff )
+    # Check for the pathological case of all singletons (to avoid coverage = 0)
+    # i.e. nn = [1], which means ff = [N]
+    if ff[ np.where( nn == 1 )[0] ] == N :  
+        # this correpsonds to the correction ff_1=N |==> ff_1=N-1
+        GoodTuring = ( N - 1 ) / N                                  
+    else :
+        sign = np.power( -1, nn + 1 )
+        binom = list( map( lambda k : 1. / comb(N,k), nn ) )
+        GoodTuring = np.sum( sign * binom * ff )
+        
+    return 1. - GoodTuring
 
-        N = np.dot( nn, ff )
-        # Check for the pathological case of all singletons (to avoid coverage = 0)
-        # i.e. nn = [1], which means ff = [N]
-        if ff[ np.where( nn == 1 )[0] ] == N :  
-            # this correpsonds to the correction ff_1=N |==> ff_1=N-1
-            GoodTuring = ( N - 1 ) / N                                  
-        else :
-            sign = np.power( -1, nn + 1 )
-            binom = list( map( lambda k : 1. / comb(N,k), nn ) )
-            GoodTuring = np.sum( sign * binom * ff )
-            
-        return 1. - GoodTuring
+def ChaoShen( compExp, which="Shannon" ):
+    '''Entropy estimation with Chao-Shen model (coverage adjusted estimator).
+
+    ref: 
+    Chao, A. & Shen, T.-J. Nonparametric estimation of Shannon's index of diversity when there are unseen species in sample. 
+    Environmental and Ecological Statistics 10, 429-443 (2003).
+    '''
+
+    # loading parameters from compExp 
+    N, nn, ff = compExp.N, compExp.nn, compExp.ff
+    # delete unseen categories information, i.e. 0 counts 
+    mask = np.where( nn > 0 )[0]
+    nn, ff = nn[mask], ff[mask]        
+   
+    # coverage adjusted empirical frequencies  
+    C = _GoodTuring_coverage( nn, ff )                       
+    p_vec = C * nn / N                         
+    # probability to see a bin (specie) in the sample         
+    lambda_vec = 1. - np.power( 1. - p_vec, N )         
     
-    # loading parameters from compACT 
-    N, nn, ff = compACT.N, compACT.nn, compACT.ff
-    # delete 0 counts (if present they are at position 0)
-    if 0 in nn : nn, ff = nn[1:], ff[1:]        
+    if which == "Shannon" :
+        output = np.dot( ff, Shannon_oper( p_vec ) / lambda_vec )
 
-    C = __coverage( nn, ff )                            
-    p_vec = C * nn / N                                  # coverage adjusted empirical frequencies
-    lambda_vec = 1. - np.power( 1. - p_vec, N )         # probability to see a bin (specie) in the sample
+    elif which == "Simpson" :
+        output = np.dot( ff, Simpson_oper( p_vec ) / lambda_vec )
 
-    output = - np.dot( ff , p_vec * np.log( p_vec ) / lambda_vec )
+    else :
+        raise IOError("FIXME: place holder.")
+            
     return np.array( output )
 ###
 
@@ -148,33 +221,41 @@ def ChaoShen( compACT ):
 #  DIRICHELET ESTIMATOR  #
 ##########################
 
-def Dirichlet( compACT, a ):
+def Dirichlet( compExp, a, which="Shannon", ):
     '''Entropy estimation with Dirichlet-multinomial pseudocount model.
 
     Parameters
     ----------  
 
     a: float
-        Dirichlet parameter
+        concentration parameter
     '''
 
-    # loading parameters from compACT 
-    N, K = compACT.N, compACT.K
-    nn, ff = compACT.nn, compACT.ff
+    # loading parameters from compExp 
+    N, K = compExp.N, compExp.K
+    nn, ff = compExp.nn, compExp.ff
 
     if a == "optimal" :
-        a = optimal_dirichlet_param_(compACT)
+        a = optimal_dirichlet_param(compExp)
     else :
         try:
             a = np.float64(a)
         except :
-            raise IOError('The Dirichlet parameter must be a scalar.')
+            raise IOError('The concentration parameter `a` must be a scalar.')
         if a < 0 :
-            raise IOError('The Dirichlet parameter must greater than 0.')
+            raise IOError('The concentration parameter `a` must greater than 0.')
 
     # frequencies with pseudocounts
     hh_a = (nn + a) / (N + K * a)      
     
-    output = - np.dot( ff , hh_a * np.log( hh_a ) )
+    if which == "Shannon" :
+        output = np.dot( ff, Shannon_oper( hh_a ) )
+
+    elif which == "Simpson" :  
+        output = np.dot( ff, Simpson_oper( hh_a ) )
+
+    else :
+        raise IOError("Unknown method `Dirichlet` for the chosen quantity.")
+
     return np.array( output )
 ###
