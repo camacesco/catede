@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Nemenmann-Shafee-Bialek Method for Shannon entropy
+    Nemenmann-Shafee-Bialek Method for Simpson index
     Copyright (C) February 2023 Francesco Camaglia, LPENS 
 
     ref: 
@@ -20,21 +20,21 @@ from .beta_func_multivar import *
 
 
 def main(
-    compExp, error=False, n_bins="default", 
+    CompExp, error=False, n_bins="default", 
     CPU_Count=None, verbose=False,
     ):
-    ''' Nemenman-Shafee-Bialek estimator for Shannon entropy.'''
+    ''' Nemenman-Shafee-Bialek estimator for Simpson index.'''
     
     # >>>>>>>>>>>>>>>>>>>>>>
     #  CHECK user OPTIONS  #
     # >>>>>>>>>>>>>>>>>>>>>>
 
     # number of categories #
-    K = compExp.K
+    K = CompExp.K
         
     # number of bins #
     if n_bins == "default" :
-        n_bins = empirical_n_bins( compExp.N, K )
+        n_bins = empirical_n_bins( CompExp.N, K )
     try :
         n_bins = int(n_bins)
     except :
@@ -56,7 +56,7 @@ def main(
     disable = not verbose
 
     #  Find Point for Maximum Likelihood #  
-    a_star = optimal_entropy_param( compExp ) 
+    a_star = optimal_simpson_param( CompExp ) 
 
     if saddle_point_method is True :
 
@@ -64,9 +64,9 @@ def main(
         #  SADDLE POINT METHOD  #
         # <<<<<<<<<<<<<<<<<<<<<<<
 
-        S1_star = compExp.entropy(a_star) 
+        S1_star = CompExp.simpson(a_star) 
         if error is True :
-            S2_star = compExp.squared_entropy(a_star)
+            S2_star = CompExp.squared_simpson(a_star)
             S_StdDev_star = np. sqrt(S2_star - np.power(S1_star, 2))  
             estimate = np.array([S1_star, S_StdDev_star], dtype=np.float64) 
         else :
@@ -78,17 +78,17 @@ def main(
         #  PRE COMPUTATIONS  #
         # <<<<<<<<<<<<<<<<<<<<
 
-        hess_LogPosterior = Polya(a_star, compExp).log_hess() + DirEntr(a_star, K).logMetapr_hess()
+        hess_LogPosterior = Polya(a_star, CompExp).log_hess() + DirSimps(a_star, K).logMetapr_hess()
         std_a = np.power( - hess_LogPosterior, -0.5 )
         alpha_vec = centered_logspaced_binning( a_star, std_a, n_bins )
 
         #  Compute Posterior (old ``Measure Mu``) for alpha #
-        log_mu_alpha = list(map(lambda a : Polya(a, compExp).log(), alpha_vec ))   
+        log_mu_alpha = list(map(lambda a : Polya(a, CompExp).log(), alpha_vec ))   
         log_mu_alpha -= np.max( log_mu_alpha ) # regularization
         mu_a = np.exp( log_mu_alpha )
 
         # for uniform binning in prior expected entropy
-        A_vec = DirEntr(alpha_vec, compExp.K).aPrioriExpec()
+        A_vec = DirSimps(alpha_vec, CompExp.K).aPrioriExpec()
         
         # >>>>>>>>>>>>>>>>>>>>>>>
         #  estimators vs alpha  #
@@ -96,15 +96,15 @@ def main(
 
         POOL = multiprocessing.Pool( CPU_Count )  
 
-        # entropy( a ) computation
+        # simpson( a ) computation
         tqdm_args = tqdm( alpha_vec, total=len(alpha_vec), desc="Error Eval", disable=disable ) 
-        all_S1_a = POOL.map( compExp.entropy, tqdm_args )
+        all_S1_a = POOL.map( CompExp.simpson, tqdm_args )
         all_S1_a = np.asarray(all_S1_a)
         
-        # squared-entropy (a) computation
+        # squared-simpson (a) computation
         if error is True :
             tqdm_args = tqdm( alpha_vec, total=len(alpha_vec), desc="Error Eval", disable=disable )
-            all_S2_a = POOL.map( compExp.squared_entropy, tqdm_args )   
+            all_S2_a = POOL.map( CompExp.squared_simpson, tqdm_args )   
             all_S2_a = np.asarray(all_S2_a)
             
         POOL.close()

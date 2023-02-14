@@ -1,6 +1,6 @@
 
 '''
-    (in development) Gamam Expansion
+    (in development) Gamma Expansion
     Copyright (C) November 2022 Francesco Camaglia, LPENS 
 '''
 
@@ -15,7 +15,6 @@ from .new_calculus import *
 def Gamma_Exp_( compExp, order, b) :
     ''' Derivative of logGamma  '''
     yvec = compExp.nn + b
-    Y = compExp.N + compExp.K * b
 
     if order == 1 :
         # d_i logGamma 
@@ -29,9 +28,8 @@ def Gamma_Exp_( compExp, order, b) :
         yield outer( diGmm(yvec), diGmm(yvec) )
 
 def devGamma_Exp_( compExp, order, b) :
-    ''' double Derivative of logGamma  '''
+    ''' double Derivative of logGamma ??? '''
     yvec = compExp.nn + b
-    Y = compExp.N + compExp.K * b
 
     if order == 1 :
         # d_i logGamma 
@@ -75,13 +73,12 @@ def devMeasure_Gamma_Exp_( compExp, order, b, gK ) :
         yield outer( D_diGmm( yvec, YgK ), outer( diGmm(yvec), diGmm(yvec) ) )
 
 
-
 # >>>>>>>>>>>>>>
 #  LIKELIHOOD  #
 # <<<<<<<<<<<<<<
 
 def Posterior_Expansion( compDiv, a, b, gK, order=2 ) :
-    '''Return the contribution of the expnasion.''' 
+    '''Return the contribution of the expansion.''' 
     compExp_1, compExp_2, = compDiv.compact_1,  compDiv.compact_2
 
     # expansion
@@ -115,7 +112,7 @@ def optimal_divergence_gamma_exp_param_( compDiv ) :
         Kgamma2 = 0.5 * ( Kgamma**2 )
 
         # likelihood contribution
-        c1 = log_alphaLikelihood( compExp_1, alpha ) + log_alphaLikelihood( compExp_2, beta )
+        c1 = Polya( compExp_1, alpha ).log() + Polya( compExp_2, beta ).log()
 
         # NOT expanded denominator of multivar beta
         c1 += LogGmm( Y ) - LogGmm( Y + Kgamma ) - LogGmm( K*beta ) + LogGmm( K*beta + Kgamma )
@@ -132,8 +129,7 @@ def optimal_divergence_gamma_exp_param_( compDiv ) :
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
         return - ( c1 - c2 )
 
-    guess_a = optimal_dirichlet_param_( compDiv.compact_1 )[0]
-    guess_b = optimal_dirichlet_param_( compDiv.compact_2 )[0]
+    guess_a, guess_b = optimal_KL_divergence_params( compDiv  )
 
     return myMinimizer( myfunc, [guess_a, guess_b, 0.1], (compDiv,) )
 

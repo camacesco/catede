@@ -29,9 +29,7 @@ def main(
 
     # number of bins
     if n_bins == "default" :
-        # empirical choice ~
-        n_bins = max( 1, np.round(5 * np.power(K / np.min([CompDiv.N_1, CompDiv.N_2]), 2)) )
-        n_bins = min( n_bins, 100 ) 
+        n_bins = empirical_n_bins( min(CompDiv.N_1, CompDiv.N_2), K )
     try :
         n_bins = int(n_bins)
     except :

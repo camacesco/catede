@@ -182,25 +182,6 @@ class Experiment( Skeleton_Class ) :
 
         Simpson infrx estimation through a chosen `method`.
         The unit (of the logarithm) can be specified with the parameter `unit`.
-            
-        Parameters
-        ----------
-        method: str
-            the name of the entropy estimation method:
-            - "naive": naive estimator (default);
-            - "MM": Miller Madow estimator;
-            - "CS": Chao Shen estimator;       
-            - "shrink": shrinkage estimator;       
-            - "Jeffreys": Jeffreys estimator;
-            - "Laplace": Laplace estimator;
-            - "SG": Schurmann-Grassberger estimator;
-            - "minimax": minimax estimator;
-            - "NSB": Nemenman Shafee Bialek estimator.
-        unit: str, optional
-            the entropy logbase unit:
-            - "ln": natural logarithm (default);
-            - "log2": base 2 logarihtm;
-            - "log10":base 10 logarithm.
 
         return numpy.array
         '''
@@ -211,10 +192,6 @@ class Experiment( Skeleton_Class ) :
         '''It provides aliases for computations.'''
         return Experiment_Compact( source=self )
 
-    def rank_plot( self, figsize=(3,3), color="#ff0054", xlabel="rank", ylabel="frequency", grid=True, logscale=True) :
-        '''Rank plot.'''
-        return experiment_rank_plot( self, figsize=figsize, color=color, xlabel=xlabel, ylabel=ylabel, logscale=logscale, grid=grid)
-     
     def save_compact( self, filename ) :
         '''It saves the compact features of Experiment to `filename`.'''
         self.compact( )._save( filename )
@@ -354,15 +331,9 @@ class Divergence( Skeleton_Class ) :
         
         return default_divergence.switchboard( self.compact(), method=method, which="Hellinger", **kwargs )
 
-
-    def rank_plot( self, figsize=(3,3), color1="#ff0054", color2="#0088ff", xlabel="rank", ylabel="frequency", logscale=True, grid=True, by_first=True) :
-        '''Rank plot.'''
-        return divergence_rank_plot( self, figsize=figsize, color1=color1, color2=color2, xlabel=xlabel, ylabel=ylabel, logscale=logscale, grid=grid, by_first=by_first )
-
     def compact( self ) :
         '''It provides aliases for computations.'''
         return Divergence_Compact( self )
-
 
     def save( self, filename, compression="gzip" ) : 
         '''Save the Divergence object to `filename`.'''
@@ -380,65 +351,8 @@ class Divergence( Skeleton_Class ) :
 
 def load_diver( filename ) :
     '''  Load the Divergence object stored in `filename`. '''
-    df = pd.read_csv( filename, sep=" ", index_col=0, compression="infer" )
+    df = pd.read_csv( filename, sep=" ", index_col=0, compression="infer", na_filter=False )
     this_categories = df.loc["__usr_n_categ__"].max()
     df = df.drop(index=["__usr_n_categ__"])
     Div = Divergence( df["Exp-1"], df["Exp-2"], categories=this_categories )
     return Div
-
-# >>>>>>>>>>>>
-#  GRAPHICS  #
-# <<<<<<<<<<<<
-
-def experiment_rank_plot( 
-    experiment_object, figsize=(3,3), color="#ff0054", 
-    xlabel="rank", ylabel="frequency", logscale=True, grid=True ) :
-    ''' '''
-
-    fig, ax = plt.subplots(ncols=1, figsize=figsize )
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    if logscale :
-        ax.set_xscale("log")
-        ax.set_yscale("log")
-    if grid :
-        ax.set_axisbelow(True)
-        ax.yaxis.grid(color='gray', linestyle='dashed')
-    ax.set_xlim([1, experiment_object.usr_n_categ])
-
-    sequences = experiment_object.data_hist
-    N = experiment_object.tot_counts
-    x = np.arange(len(sequences)) + 1
-    y = sequences.sort_values(ascending=False).values / N
-    ax.plot( x ,y, ls="", marker="o", color=color )
-    return ax
-
-def divergence_rank_plot( 
-    divergence_object, figsize=(3,3), color1="#ff0054", color2="#0088ff",
-    xlabel="rank", ylabel="frequency", logscale=True, grid=True, by_first=True ) :
-    ''' '''
-    
-    fig, ax = plt.subplots(ncols=1, figsize=figsize )
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    if logscale :
-        ax.set_xscale("log")
-        ax.set_yscale("log")
-    if grid :
-        ax.set_axisbelow(True)
-        ax.yaxis.grid(color='gray', linestyle='dashed')
-    ax.set_xlim([1, divergence_object.usr_n_categ])
-
-    sort_by = [ 'Exp-1' if by_first else 'Exp-2' ]
-    data_hist = divergence_object.data_hist.sort_values( by=sort_by, ascending=False)
-    sequences_1 = data_hist['Exp-1']
-    N_1 = divergence_object.tot_counts['Exp-1']
-    sequences_2 = data_hist['Exp-2']
-    N_2 = divergence_object.tot_counts['Exp-2']
-
-    x = np.arange(len(data_hist)) + 1
-    y1 = sequences_1.values / N_1
-    ax.plot( x, y1, ls="", marker="o", color=color1 )
-    y2 = sequences_2.values / N_2
-    ax.plot( x, y2, ls="", marker="s", color=color2 )
-    return ax
