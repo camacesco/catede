@@ -7,7 +7,6 @@
 '''
 import warnings
 import numpy as np
-import mpmath as mp
 import pandas as pd
 import itertools
 from scipy.special import loggamma, polygamma

@@ -9,7 +9,7 @@
 import warnings
 import numpy as np
 from scipy import optimize 
-from kamapack.beta_func_multivar import *
+from .beta_func_multivar import *
 
 N_SIGMA = 1.5
 MAX_ITER = 500
