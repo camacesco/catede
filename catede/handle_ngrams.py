@@ -547,6 +547,10 @@ class markov_class() :
         '''exact Kullback-Leibler divergence with stationary states as initial.'''
         return _exact_kullbackleibler( self, markov_obj2 )
 
+    def exact_squared_hellinger( self, markov_obj2 ) :
+        '''exact squared Hellinger divergence with stationary states as initial.'''
+        return _exact_squared_hellinger( self, markov_obj2 )
+    
 # >>>>>>>>>>>>>>>>>>>
 #  Other Functions  #
 # <<<<<<<<<<<<<<<<<<<
@@ -575,6 +579,25 @@ def _exact_kullbackleibler( markov_obj1, markov_obj2 ) :
 
         output = crossentropy_ex - entropy_ex_1
         
+    return output
+
+def _exact_squared_hellinger( markov_obj1, markov_obj2 ) :
+    '''
+    Brute force computation of the squared Hellinger divergence for L-grams generated through Markov chains
+    with transition matrices equal to `MarkovMatrix_A` and `MarkovMatrix_B`.
+    '''
+
+    assert markov_obj1.n_states == markov_obj2.n_states
+    assert markov_obj1.length == markov_obj2.length
+    L = markov_obj1.length
+
+    if np.all( markov_obj1.markov_matrix == markov_obj2.markov_matrix ) :
+        output = 0.
+    
+    else :
+        pmf_1 = markov_obj1.pmf( )
+        pmf_2 = markov_obj2.pmf( )
+        output = 1 - np.dot( np.sqrt(pmf_1), np.sqrt(pmf_2))       
     return output
     
 def normalize_matrix( A ) :

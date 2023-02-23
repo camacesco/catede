@@ -3,14 +3,13 @@
 
 '''
     Multivariate Beta Function Calculus (in development)
-    Copyright (C) October 2022 Francesco Camaglia, LPENS 
+    Copyright (C) February 2023 Francesco Camaglia, LPENS 
 '''
 import warnings
 import numpy as np
 import pandas as pd
 import itertools
 from scipy.special import loggamma, polygamma
-from scipy.special import beta as beta_func   
 
 class Experiment_Compact :
     def __init__( self, source=None, is_div=None, is_comp=False, load=None ) :
@@ -68,45 +67,7 @@ class Experiment_Compact :
                 else :
                     raise IOError("Unrecognized identifier for `is_div`.")                
 
-    def entropy( self, a ) :
-        '''Posterior Multinomial-Dirichlet Shannon entropy estimator.'''
-        return post_entropy_( self, a )
-
-    def squared_entropy( self, a ) :
-        '''Posterior Multinomial-Dirichlet sqaured Shannon entropy estimator.'''
-        return post_entropy_sqr_( self, a )
-
-    def simpson( self, a ) :
-        '''Posterior Multinomial-Dirichlet Simpson index estimator.'''
-        return post_simpson_( self, a )
-
-    def squared_simpson( self, a ) :
-        '''Posterior Multinomial-Dirichlet sqaured entropy estimator.'''
-        return post_simpson_sqr_( self, a )
-
-    def _Omega( self, terms, a ) :
-        '''Shift function Omega.'''
-        return Omega_( self, terms, a )
-
-    def _derOmega( self, shift, terms, a ) :
-        '''Derivative of shift function Omega.'''
-        if shift == 1 :
-            return derOmegaS1_( self, terms, a )
-        elif shift == 2 :
-            return derOmegaS2_( self, terms, a )
-        elif shift == 3 :
-            return derOmegaS3_( self, terms, a )
-
-    def _Lambda( self, order, a ) :
-        '''Derivative function Lambda.'''
-        return Lambda_( self, order, a )
-
-    def _ffsum( self, sumGens, dim ) :
-        return count_hist_sum_( self.ff, sumGens, dim )
-
-    def _norm_ffsum( self, sumGens, a, dim, dimNorm=None ) :
-        if dimNorm is None : dimNorm = dim
-        return Normalize_Omega_( self, dimNorm, a, self._ffsum( sumGens, dim ) )
+    ''' *** Save/Load *** '''
 
     def _save( self, filename ) : 
         '''Save the Experiment_Compact object to `filename`.'''
@@ -136,6 +97,120 @@ class Experiment_Compact :
         assert len(df) == int(params['size_of_ff'])
         self.nn = df['nn'].values
         self.ff = df['ff'].values  
+
+    ''' *** Multivariate Beta Operations *** '''
+
+    def _Omega( self, terms, a ) :
+        '''Shift function Omega.'''
+        return Omega_( self, terms, a )
+
+    def _derOmega( self, shift, terms, a ) :
+        '''Derivative of shift function Omega.'''
+        if shift == 1 :
+            return derOmegaS1_( self, terms, a )
+        elif shift == 2 :
+            return derOmegaS2_( self, terms, a )
+        elif shift == 3 :
+            return derOmegaS3_( self, terms, a )
+
+    def _hash_Omega( self, terms, a ) :
+        '''Half-Shift function hash-Omega.'''
+        return hash_Omega_( self, terms, a )
+
+    def _Lambda( self, order, a ) :
+        '''Derivative function Lambda.'''
+        return Lambda_( self, order, a )
+
+    ''' *** Multidimensional Summations *** '''
+
+    def _ffsum( self, sumGens, dim ) :
+        return count_hist_sum_( self.ff, sumGens, dim )
+
+    def _norm_ffsum( self, sumGens, a, dim, dimNorm=None ) :
+        if dimNorm is None : dimNorm = dim
+        return Normalize_Omega_( self, dimNorm, a, self._ffsum( sumGens, dim ) )
+
+    ''' *** Multivariate Beta Compound Operations *** '''
+
+    def _shift_1_deriv_1( self, a ):
+        '''     q_i ln(q_i)     '''
+        
+        Omega_1 = self._Omega( "i", a )
+        dvOmega_1_1 = self._derOmega( 1, "ii", a )
+        Lambda_1 = self._Lambda( 1, a )
+
+        gens = zip( Omega_1, Lambda_1, dvOmega_1_1 )
+        sumGens = ( Om * ( Lm + dvOm ) for Om, Lm, dvOm in gens )
+        return sumGens
+
+    def _shift_2_deriv_1( self, a ):
+        '''     q_i q_j ln(q_i)     '''
+        
+        Omega_2 = self._Omega( "ij", a )
+        Lambda_1up = one_up_DX_( self._Lambda( 1, a ) )
+        dvOmega_2_1 = self._derOmega( 2, "iji", a )
+
+        gens = zip( Omega_2, Lambda_1up, dvOmega_2_1 )
+        sumGens = ( Om_2 * ( Lm1 + dOm2_1 ) for Om_2, Lm1, dOm2_1 in gens )
+        return sumGens
+
+    def _shift_2_deriv_2( self, a ):
+        '''     q_i q_j ln(q_i) ln(q_j)     '''
+
+        Omega_2 = self._Omega( "ij", a )
+        dvOmega_2_1 = self._derOmega( 2, "iji", a )
+        dvOmega_2_2 = self._derOmega( 2, "ijij", a )
+        Lambda_1up = one_up_SX_( self._Lambda( 1, a ) )
+        Lambda_2 = self._Lambda( 2, a )
+
+        gens = zip( Omega_2, Lambda_2, dvOmega_2_1, Lambda_1up, dvOmega_2_2 )
+        sumGens = ( Om_2 * ( Lm2 + 2 * Lm1 * dOm2_1 + dOm2_2 ) for Om_2, Lm2, dOm2_1, Lm1, dOm2_2 in gens )
+        return sumGens
+
+    def _shift_3_deriv_1( self, a ):
+        '''     q_i q_j q_k ln(q_i)     '''
+        
+        Omega_3 =  self._Omega( "ijk", a )
+        Lambda_1up = one_up_DX_( one_up_DX_( self._Lambda( 1, a ) ) )
+        dvOmega_3_1 = self._derOmega( 3, "ijki", a )
+
+        gens = zip( Omega_3, Lambda_1up, dvOmega_3_1 )
+        sumGens = ( Om * ( Lm + dvOm ) for Om, Lm, dvOm in gens )
+        return sumGens
+    
+    ''' *** Polya Posterior Methods *** '''
+
+    def entropy( self, a ) :
+        '''Expected Shannon entropy under Polya posterior.
+            - sum_i < q_i ln(q_i) | n ; a >
+        '''
+        sumGens = self._shift_1_deriv_1( a )
+        sum_value = - self._norm_ffsum( sumGens, a, dim=1 )
+        return sum_value
+
+    def squared_entropy( self, a ) :
+        '''Expected squared Shannon entropy under Polya posterior.
+            sum_ij < q_i q_j ln(q_i) ln(q_j) | n ; a > 
+        '''
+        sumGens = self._shift_2_deriv_2( a )
+        sum_value = self._norm_ffsum( sumGens, a, dim=2 )
+        return sum_value
+
+    def simpson( self, a ) :
+        '''Expected Simpson index under Polya posterior.
+            sum_i < q_i^2 | n ; a > 
+        '''
+        sumGens = self._Omega( "ii", a )
+        sum_value = self._norm_ffsum( sumGens, a, dim=1, dimNorm=2 )
+        return sum_value
+
+    def squared_simpson( self, a ) :
+        '''Expected squared Simpson index under Polya posterior.
+            sum_ij < q_i^2 * q_j^2 | n ; a >   
+        '''
+        sumGens = self._Omega( "iijj", a )
+        sum_value = self._norm_ffsum( sumGens, a, dim=2, dimNorm=4 )
+        return sum_value
 ###
 
 ##############################
@@ -166,15 +241,7 @@ class Divergence_Compact :
 
     def _ffsum( self, sumList, dim ) :
         return count_hist_sum_( self.ff, sumList, dim )
-
-    def divergence( self, a, b ) :
-        '''Posterior independent Multinomial-Dirichlet divergence estimator.'''
-        return post_divergence_( self, a, b )
-
-    def squared_divergence( self, a, b ) :
-        '''Posterior independent Multinomial-Dirichlet squareddivergence estimator.'''
-        return post_divergence_sqr_( self, a, b )
-
+    
     def _save( self, filename ) : 
         # FIXME : how to implement for compression? (change also load)
         '''Save the Divergence_Compact object to `filename`.'''
@@ -187,7 +254,6 @@ class Divergence_Compact :
         pd.DataFrame(
             { 'nn_1' : self.nn_1, 'nn_2' : self.nn_2, 'ff' : self.ff }
         ).to_csv( filename, sep=' ', mode='a', header=True, index=False )
-
 
     def _load( self, filename ) : 
         '''Load the saved Divergence_Compact object from `filename`.'''
@@ -213,8 +279,91 @@ class Divergence_Compact :
         self.ff = df['ff'].values
         self.compact_1 = Experiment_Compact( source=self, is_div=1, is_comp=True )
         self.compact_2 = Experiment_Compact( source=self, is_div=2, is_comp=True )
-###
 
+    ''' *** Multivariate Beta Compound Operations *** '''
+
+    def _Q_shift_1_T_deriv_1( self, a, b ):
+        '''     q_i ln(t_i)     '''
+
+        Omega_1_q = self.compact_1._Omega( "i", a )
+        Lambda_1_t = self.compact_2._Lambda( 1, b )
+
+        gens = zip( Omega_1_q, Lambda_1_t )
+        sumGens = ( Om_q * Lm_t for Om_q, Lm_t in gens )
+        return sumGens
+
+    def _Q_shift_2_deriv_1_T_deriv_1( self, a, b ):
+        '''     q_i q_j ln(q_i) ln(t_j)     '''
+
+        Omega_2_q = self.compact_1._Omega( "ij", a )
+        dvOmega_2_1 = self.compact_1._derOmega( 2, "iji", a )
+        Lambda_1up_q = one_up_DX_( self.compact_1._Lambda( 1, a ) )
+        Lambda_1up_t = one_up_SX_( self.compact_2._Lambda( 1, b ) )
+
+        gens = zip( Omega_2_q, Lambda_1up_q, dvOmega_2_1, Lambda_1up_t )
+        sumGens = ( Om_2_q * ( Lm1_q + dOm2_1_q ) * Lm1_t for Om_2_q, Lm1_q, dOm2_1_q, Lm1_t in gens )
+        return sumGens
+
+    def _Q_shift_2_T_deriv_2( self, a, b ):
+        '''     q_i q_j ln(t_i) ln(t_j)     '''
+
+        Omega_2_q = self.compact_1._Omega( "ij", a )
+        Lambda_2_t = self.compact_2._Lambda( 2, b )
+
+        gens = zip( Omega_2_q, Lambda_2_t )
+        sumGens = ( Om2_q * Lm2_t for Om2_q, Lm2_t in gens )
+        return sumGens
+
+    ''' *** Polya Posterior Methods *** '''
+
+    def kullback_leibler( self, a, b ) :
+        '''Expected Kullback-Leibler divergence under Polya posterior.
+                sum_i < q_i ln(q_i) - q_i ln(t_i) | n, m ; a, b > 
+        '''
+        sumGens_QlogQ = self.compact_1._shift_1_deriv_1( a )
+        sumGens_QlogT = self._Q_shift_1_T_deriv_1( a, b )
+        gens = zip( sumGens_QlogQ, sumGens_QlogT )
+        sumGens = ( QlogQ - QlogT for QlogQ, QlogT in gens )
+
+        return  self.compact_1._norm_ffsum( sumGens, a, dim=1 )
+
+    def squared_kullback_leibler( self, a, b ) :
+        '''Expected squared Kullback-Leibler divergence under Polya posterior.
+            sum_ij < q_i q_j ln(q_i) ln(q_j) - 2 * < q_i q_j ln(q_i) ln(t_j) + q_i q_j ln(t_i) ln(t_j) | n, m ; a, b > 
+        '''
+
+        sumGens_Q2logQ2 = self.compact_1._shift_2_deriv_2( a )
+        sumGens_Q2logQlogT = self._Q_shift_2_deriv_1_T_deriv_1( a, b )
+        sumGens_Q2logT2 = self._Q_shift_2_T_deriv_2( a, b )
+        gens = zip( sumGens_Q2logQ2, sumGens_Q2logQlogT, sumGens_Q2logT2 )
+        sumGens = ( Q2logQ2 - 2 * Q2logQlogT + Q2logT2 for Q2logQ2, Q2logQlogT, Q2logT2 in gens )
+
+        return self.compact_1._norm_ffsum( sumGens, a, dim=2 )
+
+    def bhattacharrya( self, a, b ) :
+        '''Posterior Bhattacharrya coefficient estimator.
+            sum_i < sqrt{q_i} sqrt{t_i} | n, m ; a, b > 
+        '''
+        sumGens_Qh = self.compact_1._hash_Omega( "i", a )
+        sumGens_Th = self.compact_2._hash_Omega( "i", b )
+        gens = zip( sumGens_Qh, sumGens_Th )
+        sumGens = ( Qh * Th for Qh, Th in gens )
+
+        return  self.compact_1._ffsum( sumGens, dim=1 )
+
+    def squared_bhattacharrya( self, a, b ) :
+        '''Posterior Bhattacharrya coefficient estimator.
+            sum_ij < sqrt{q_i} sqrt{q_j} sqrt{t_i} sqrt{t_j} | n, m ; a, b > 
+        '''
+        sumGens_Qh2 = self.compact_1._hash_Omega( "ij", a )
+        sumGens_Th2 = self.compact_2._hash_Omega( "ij", b )
+        gens = zip( sumGens_Qh2, sumGens_Th2 )
+        sumGens = ( Qh2 * Th2 for Qh2, Th2 in gens )
+        X = self.N_1 + self.K * a
+        Y = self.N_2 + self.K * b
+
+        return np.divide( self.compact_1._ffsum( sumGens, dim=2 ), X * Y )
+    
 ################
 #  SUMMATIONS  #
 ################
@@ -255,6 +404,10 @@ def count_hist_sum_( ff, sumGens, dim ) :
 #  NOTATION  #
 ##############
 
+def LogGmm( x ): 
+    ''' alias of Log Gamma function'''
+    return loggamma( x ).real  
+
 def diGmm(x) :    
     '''Digamma function (polygamma of order 0).'''
     return polygamma(0, x)
@@ -282,10 +435,6 @@ def D_triGmm(x, y):
 def D_quadriGmm(x, y):
     '''Difference between quadrigamma functions in `x` and `y`.'''
     return quadriGmm(x) - quadriGmm(y) 
-
-def LogGmm( x ): 
-    ''' alias of Log Gamma function'''
-    return loggamma( x ).real  
 
 ####################################
 #  MULTIVARIATE BETA COMPUTATIONS  #
@@ -328,6 +477,27 @@ def ListIndexes( INDEX ) :
             termsList.append( tuple([ tmp_dict[k] for k in INDEX ]) )
 
     return termsList
+
+def hash_Omega_( compExp, terms, a) :
+    '''Generator of the half-shift functions hash-Omega. Not to be normalized.'''
+    xvec = compExp.nn + a
+    K = compExp.K
+    X = compExp.N + K * a
+
+    termsList = ListIndexes( terms )
+    shift = len(terms)
+    if shift == 1 :
+        # B (x+0.5i) / B
+        if (0) in termsList :                               # i
+            yield np.exp( LogGmm(X) - LogGmm(X+0.5) - LogGmm(xvec) + LogGmm(xvec+0.5) ) 
+
+    elif shift == 2 :
+        # B (x+0.5i+0.5j) / B
+        if (0,0) in termsList :                             # i==j
+            yield xvec
+        if (0,1) in termsList :                             # i!=j
+            tmp = np.exp( LogGmm(xvec+0.5) - LogGmm(xvec) )
+            yield outer( tmp , tmp )
 
 def Omega_( compExp, terms, a) :
     '''Generator of the shift functions Omega.'''
@@ -585,150 +755,3 @@ def one_up_DX_( x ) :
         yield outer( tmp2D, ones(xlen) )    # (0,1)->(0,1;*)
     except StopIteration:
         yield outer( tmp1D, ones(xlen) )    # (0)->(0;*) V (0,0)->(0,0;*)
-
-# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-#  SHIFTS/DERIVATIVES of BETA_FUNC  #
-# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-def shift_1_deriv_1( compExp, a ):
-    '''     < q_i ln(q_i) >     '''
-    
-    Omega_1 = compExp._Omega( "i", a )
-    dvOmega_1_1 = compExp._derOmega( 1, "ii", a )
-    Lambda_1 = compExp._Lambda( 1, a )
-
-    gens = zip( Omega_1, Lambda_1, dvOmega_1_1 )
-    sumGens = ( Om * ( Lm + dvOm ) for Om, Lm, dvOm in gens )
-    return sumGens
-
-def shift_2_deriv_1( compExp, a ):
-    '''     < q_i q_j ln(q_i) >     '''
-    
-    Omega_2 = compExp._Omega( "ij", a )
-    Lambda_1up = one_up_DX_( compExp._Lambda( 1, a ) )
-    dvOmega_2_1 = compExp._derOmega( 2, "iji", a )
-
-    gens = zip( Omega_2, Lambda_1up, dvOmega_2_1 )
-    sumGens = ( Om_2 * ( Lm1 + dOm2_1 ) for Om_2, Lm1, dOm2_1 in gens )
-    return sumGens
-
-def shift_2_deriv_2( compExp, a ):
-    '''     < q_i q_j ln(q_i) ln(q_j) >     '''
-
-    Omega_2 = compExp._Omega( "ij", a )
-    dvOmega_2_1 = compExp._derOmega( 2, "iji", a )
-    dvOmega_2_2 = compExp._derOmega( 2, "ijij", a )
-    Lambda_1up = one_up_SX_( compExp._Lambda( 1, a ) )
-    Lambda_2 = compExp._Lambda( 2, a )
-
-    gens = zip( Omega_2, Lambda_2, dvOmega_2_1, Lambda_1up, dvOmega_2_2 )
-    sumGens = ( Om_2 * ( Lm2 + 2 * Lm1 * dOm2_1 + dOm2_2 ) for Om_2, Lm2, dOm2_1, Lm1, dOm2_2 in gens )
-    return sumGens
-
-def shift_3_deriv_1( compExp, a ):
-    '''     < q_i q_j q_k ln(q_i) >     '''
-    
-    Omega_3 = compExp._Omega( "ijk", a )
-    Lambda_1up = one_up_DX_( one_up_DX_( compExp._Lambda( 1, a ) ) )
-    dvOmega_3_1 = compExp._derOmega( 3, "ijki", a )
-
-    gens = zip( Omega_3, Lambda_1up, dvOmega_3_1 )
-    sumGens = ( Om * ( Lm + dvOm ) for Om, Lm, dvOm in gens )
-    return sumGens
-
-def Q_shift_1_T_deriv_1( compDiv, a, b ):
-    '''     < q_i ln(t_i) >     '''
-
-    Omega_1_q = compDiv.compact_1._Omega( "i", a )
-    Lambda_1_t = compDiv.compact_2._Lambda( 1, b )
-
-    gens = zip( Omega_1_q, Lambda_1_t )
-    sumGens = ( Om_q * Lm_t for Om_q, Lm_t in gens )
-    return sumGens
-
-def Q_shift_2_deriv_1_T_deriv_1( compDiv, a, b ):
-    '''     < q_i q_j ln(q_i) ln(t_j) >     '''
-
-    Omega_2_q = compDiv.compact_1._Omega( "ij", a )
-    dvOmega_2_1 = compDiv.compact_1._derOmega( 2, "iji", a )
-    Lambda_1up_q = one_up_DX_( compDiv.compact_1._Lambda( 1, a ) )
-    Lambda_1up_t = one_up_SX_( compDiv.compact_2._Lambda( 1, b ) )
-
-    gens = zip( Omega_2_q, Lambda_1up_q, dvOmega_2_1, Lambda_1up_t )
-    sumGens = ( Om_2_q * ( Lm1_q + dOm2_1_q ) * Lm1_t for Om_2_q, Lm1_q, dOm2_1_q, Lm1_t in gens )
-    return sumGens
-
-def Q_shift_2_T_deriv_2( compDiv, a, b ):
-    '''     < q_i q_j ln(t_i) ln(t_j) >     '''
-
-    Omega_2_q = compDiv.compact_1._Omega( "ij", a )
-    Lambda_2_t = compDiv.compact_2._Lambda( 2, b )
-
-    gens = zip( Omega_2_q, Lambda_2_t )
-    sumGens = ( Om2_q * Lm2_t for Om2_q, Lm2_t in gens )
-    return sumGens
-
-# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-#  INDIPENDENT PRIORS ESTIMATORS  #
-# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-def post_entropy_( compExp, a ):
-    '''Estimate of the entropy at alpha.
-        - sum_i < q_i ln(q_i) >
-    '''
-
-    sumGens = shift_1_deriv_1( compExp, a )
-    sum_value = - compExp._norm_ffsum( sumGens, a, dim=1 )
-    return sum_value
-
-def post_entropy_sqr_( compExp, a ):
-    '''Estimate of the squared entropy at alpha.
-        sum_ij < q_i q_j ln(q_i) ln(q_j) >    
-    '''
-
-    sumGens = shift_2_deriv_2( compExp, a )
-    sum_value = compExp._norm_ffsum( sumGens, a, dim=2 )
-    return sum_value
-
-def post_simpson_( compExp, a ):
-    '''Estimate of the entropy at alpha.
-        sum_i < q_i^2 >
-    '''
-    sumGens = compExp._Omega( "ii", a )
-    sum_value = compExp._norm_ffsum( sumGens, a, dim=1, dimNorm=2 )
-    return sum_value
-
-def post_simpson_sqr_( compExp, a ):
-    '''Estimate of the squared entropy at alpha.
-        sum_ij < q_i^2 * q_j^2 >    
-    '''
-
-    sumGens = compExp._Omega( "iijj", a )
-    sum_value = compExp._norm_ffsum( sumGens, a, dim=2, dimNorm=4 )
-    return sum_value
-
-
-def post_divergence_( compDiv, a, b ):
-    '''Estimate of the divergence at alpha and beta.
-        sum_i < q_i ln(q_i) - q_i ln(t_i) >
-    '''
-
-    sumGens_QlogQ = shift_1_deriv_1(compDiv.compact_1, a)
-    sumGens_QlogT = Q_shift_1_T_deriv_1(compDiv, a, b)
-    gens = zip( sumGens_QlogQ, sumGens_QlogT )
-    sumGens = ( QlogQ - QlogT for QlogQ, QlogT in gens )
-
-    return  compDiv.compact_1._norm_ffsum( sumGens, a, dim=1 )
-
-def post_divergence_sqr_( compDiv, a, b ):
-    '''Estimate of the squared divergence at alpha and beta.
-        sum_i < q_i q_j ln(q_i) ln(q_j) > - 2 * < q_i q_j ln(q_i) ln(t_j) > + < q_i q_j ln(t_i) ln(t_j) >
-    '''
-
-    sumGens_Q2logQ2 = shift_2_deriv_2( compDiv.compact_1, a )
-    sumGens_Q2logQlogT = Q_shift_2_deriv_1_T_deriv_1( compDiv, a, b )
-    sumGens_Q2logT2 = Q_shift_2_T_deriv_2( compDiv, a, b )
-    gens = zip( sumGens_Q2logQ2, sumGens_Q2logQlogT, sumGens_Q2logT2 )
-    sumGens = ( Q2logQ2 - 2 * Q2logQlogT + Q2logT2 for Q2logQ2, Q2logQlogT, Q2logT2 in gens )
-
-    return compDiv.compact_1._norm_ffsum( sumGens, a, dim=2 )

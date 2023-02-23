@@ -2,14 +2,12 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) November 2022 Francesco Camaglia, LPENS 
+    Copyright (C) February 2023 Francesco Camaglia, LPENS 
 '''
 
-import sys
 import warnings
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from .beta_func_multivar import Experiment_Compact, Divergence_Compact
 from . import default_divergence, default_entropy
 
@@ -214,7 +212,7 @@ class Divergence( Skeleton_Class ) :
 
     __doc__ += Skeleton_Class.__doc__
 
-    def __init__( self, my_exp_1, my_exp_2, categories=2, ) :
+    def __init__( self, my_exp_1, my_exp_2, categories=2, ishist=True ) :
         '''
         Parameters
         ----------    
@@ -225,9 +223,9 @@ class Divergence( Skeleton_Class ) :
         '''
 
         if type( my_exp_1 ) != Experiment :
-            my_exp_1 = Experiment( my_exp_1, categories=categories )
+            my_exp_1 = Experiment( my_exp_1, categories=categories, ishist=ishist )
         if type( my_exp_2 ) != Experiment :
-            my_exp_2 = Experiment( my_exp_2, categories=categories )
+            my_exp_2 = Experiment( my_exp_2, categories=categories, ishist=ishist )
 
         self.tot_counts = pd.Series(
             {"Exp-1": my_exp_1.tot_counts,
@@ -309,27 +307,27 @@ class Divergence( Skeleton_Class ) :
         
         return default_divergence.switchboard( self.compact(), method=method, which="Jensen-Shannon", unit=unit, **kwargs )
 
-    def symmetric_KL( self, method="naive", unit="ln", **kwargs ):
+    def symmetrized_KL( self, method="naive", unit="ln", **kwargs ):
         '''Estimate symmetric Kullback-Leibler divergence.
 
-        Kullback-Leibler divergence estimation through a chosen `method`.
+        Symmetrized Kullback-Leibler divergence estimation through a chosen `method`.
         The unit (of the logarithm) can be specified with the parameter `unit`.
 
         return numpy.array
         '''
         
-        return default_divergence.switchboard( self.compact(), method=method, which="symmetric-KL", unit=unit, **kwargs )
+        return default_divergence.switchboard( self.compact(), method=method, which="symmetrized-KL", unit=unit, **kwargs )
 
 
-    def hellinger( self, method="naive", **kwargs ):
-        '''Estimate Hellinger divergence.
+    def squared_hellinger( self, method="naive", **kwargs ):
+        '''Estimate squared Hellinger divergence.
 
         Hellinger divergence estimation through a chosen `method`.
 
         return numpy.array
         '''
         
-        return default_divergence.switchboard( self.compact(), method=method, which="Hellinger", **kwargs )
+        return default_divergence.switchboard( self.compact(), method=method, which="squared-Hellinger", **kwargs )
 
     def compact( self ) :
         '''It provides aliases for computations.'''

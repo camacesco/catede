@@ -13,10 +13,11 @@ from scipy.special import comb, entr
 from .new_calculus import optimal_dirichlet_param
 from .nsb_shannon_entropy import main as _Shannon_est
 from .nsb_simpson_index import main as _Simpson_est
+from .beta_func_multivar import D_diGmm
 import warnings 
 
 _method_List_ = [
-    "naive", "maximum-likelihood",
+    "naive",
     "NSB", "Nemenmann-Shafee-Bialek",
     "CS", "Chao-Shen", "CAE",
     "Di", "Dirichlet", 
@@ -24,7 +25,8 @@ _method_List_ = [
     "MM", "Miller-Madow", 
     "La", "Laplace", 
     "Tr", "minimax", "Trybula", 
-    "Pe", "Schurmann-Grassberger", "Perks",
+    "Pe", "Perks",
+    "Schurmann-Grassberger", 
 ]
 
 _which_List_ = ["Shannon", "Simpson"]
@@ -68,7 +70,7 @@ def switchboard( compExp, method="naive", which="Shannon", unit="default", **kwa
         unit_conv = 1
 
     # choosing entropy estimation method
-    if method in ["naive", "maximum-likelihood"] :    
+    if method in ["naive"] :    
         estimate = Naive( compExp, which=which, **kwargs )
         
     elif method in ["NSB", "Nemenman-Shafee-Bialek"]:   
@@ -84,6 +86,9 @@ def switchboard( compExp, method="naive", which="Shannon", unit="default", **kwa
         
     elif method in ["CS", "CAE", "Chao-Shen"] :        
         estimate = ChaoShen( compExp, which=which, **kwargs )
+
+    elif method in ["SG", "Schurmann-Grassberger"] :
+        estimate = Schurmann_Grassberger( compExp )
  
     elif method in ["Di", "Dirichlet"] :
         if "a" not in kwargs :
@@ -101,7 +106,7 @@ def switchboard( compExp, method="naive", which="Shannon", unit="default", **kwa
         a = 0.5
         estimate = Dirichlet( compExp, a, which=which, **kwargs )
 
-    elif method in ["Pe", "Perks", "SG", "Schurmann-Grassberger"]:
+    elif method in ["Pe", "Perks"]:
         a = 1. / compExp.Kobs
         estimate = Dirichlet( compExp, a, which=which, **kwargs )
         
@@ -146,7 +151,7 @@ def Naive( compExp, which ):
 ############################
 
 def MillerMadow( compExp, which, ): 
-    '''Entropy estimation with Miller-Madow pseudocount model.
+    '''Entropy estimation with Miller-Madow bias correction.
     
     ref:
     Miller, G. Note on the bias of information estimates. 
@@ -158,6 +163,32 @@ def MillerMadow( compExp, which, ):
 
     if which == "Shannon" :
         output = Naive( compExp, which="Shannon" ) + 0.5 * ( Kobs - 1 ) / N
+
+    else :
+        raise IOError("FIXME: place holder.")
+
+    return np.array( output )
+###
+
+
+#####################################
+#  SCHURMANN-GRASSBERGER ESTIMATOR  #
+#####################################
+
+def Schurmann_Grassberger( compExp, which, ): 
+    '''Entropy estimation with Schurmann-Grassberge method.
+    
+    ref:
+    Schürmann, T. Bias analysis in entropy estimation. 
+    J. Phys. A: Math. Gen. 37, L295 (2004).
+    '''
+    
+    # loading parameters from compExp 
+    N = compExp.N
+    nn, ff = compExp.nn, compExp.ff
+
+    if which == "Shannon" :
+        output = ff.dot( nn * D_diGmm(N, nn) ) / N
 
     else :
         raise IOError("FIXME: place holder.")

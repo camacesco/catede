@@ -9,21 +9,24 @@
 import warnings
 import numpy as np 
 from .kullback_leibler_divergence import main as _DKL_estimator
+from .squared_hellinger_divergence import main as _DH2_estimator
 from .default_entropy import _unit_Dict_
 from .new_calculus import optimal_dirichlet_param
 from scipy.special import rel_entr
+from .beta_func_multivar import D_diGmm
 
 _method_List_ = [
     "naive", "maximum-likelihood",
     "CMW", "Camaglia-Mora-Walczak", # FIXME : WARNING : this needs to be changed
+    "Zh", "Zhang-Grabchak",
     "Di", "Dirichlet", 
-    "Je", "Jeffreys", "Krichevsky-Trofimov", 
+    "Je", "Jeffreys", 
     "La", "Laplace", 
     "Tr", "mm", "minimax", "Trybula", 
-    "Pe", "Perks", "SG", "Schurmann-Grassberger",
+    "Pe", "Perks",
 ]
 
-_which_List_ = ["Hellinger", "Jensen-Shannon", "Kullback-Leibler", "symmetric-KL"]
+_which_List_ = ["squared-Hellinger", "Jensen-Shannon", "Kullback-Leibler", "symmetrized-KL"]
 
 #############
 #  ALIASES  #
@@ -50,14 +53,14 @@ def Bhattacharyya_oper( x, y ) :
 #  SWITCHBOARD  #
 #################
 
-def switchboard( compACT, method="naive", which="Kullback-Leibler", unit="default", **kwargs ):
+def switchboard( comp_div, method="naive", which="Kullback-Leibler", unit="default", **kwargs ):
 
     # check which 
     if which not in _which_List_ :
         raise IOError("Unkown divergence. Please choose `which` amongst :", _which_List_ )
     
     # loading units
-    if which in ["Jensen-Shannon", "Kullback-Leibler", "symmetric-KL"] :
+    if which in ["Jensen-Shannon", "Kullback-Leibler", "symmetrized-KL"] :
         if unit not in _unit_Dict_.keys( ) :
             warnings.warn( "Please choose `unit` amongst :", _unit_Dict_.keys( ), ". Falling back to default." )
         unit_conv = _unit_Dict_.get( unit, _unit_Dict_["default"] )
@@ -66,15 +69,23 @@ def switchboard( compACT, method="naive", which="Kullback-Leibler", unit="defaul
         
     # choosing entropy estimation method
     if method in ["naive", "maximum-likelihood"] :  
-        dkl_estimate = Naive( compACT, which=which, **kwargs )
+        divergence_estimate = Naive( comp_div, which=which, **kwargs )
     
     elif method in ["CMW", "Camaglia-Mora-Walczak"] :       
         if which in ["Jensen-Shannon"] :
-            raise IOError("Unknown method `CMW` for the chosen divergence.")
+            raise IOError(f"Unknown method `{method}` for {which}.")
         elif which == "Kullback-Leibler" :
-            dkl_estimate = _DKL_estimator( compACT, **kwargs )
-        elif which == "Hellinger" :
-            raise IOError("FIXME: place holder.")
+            divergence_estimate = _DKL_estimator( comp_div, **kwargs )
+        elif which == "squared-Hellinger" :
+            divergence_estimate = _DH2_estimator( comp_div, **kwargs )
+        elif which == "symmetrized-KL" :
+            raise SystemError("To be coded...")
+    
+    elif method in ["Zh", "Zhang-Grabchak"] :
+        if which in ["Kullback-Leibler", "symmetrized-KL"] :
+            divergence_estimate = Zhang( comp_div, which=which, **kwargs )
+        else :
+            raise IOError(f"Unknown method `{method}` for {which}.")
 
     elif method in ["Di", "Dirichlet"] :
         a = kwargs.get("a", None)
@@ -87,46 +98,46 @@ def switchboard( compACT, method="naive", which="Kullback-Leibler", unit="defaul
             b = "optimal"
             #warnings.warn("Dirichlet parameter `b` falling back to `optimal`.")
 
-        dkl_estimate = Dirichlet( compACT, a, b, which=which )       
+        divergence_estimate = Dirichlet( comp_div, a, b, which=which )       
     
     elif method in ["Je", "Jeffreys", "Krichevsky-Trofimov"] :
         a = 0.5
         b = 0.5
-        dkl_estimate = Dirichlet( compACT, a, b, which=which )
+        divergence_estimate = Dirichlet( comp_div, a, b, which=which )
     
     elif method in ["La", "Laplace", "Bayesian-Laplace"] :
         a = 1.
         b = 1.
-        dkl_estimate = Dirichlet( compACT, a, b, which=which )
+        divergence_estimate = Dirichlet( comp_div, a, b, which=which )
         
     elif method in ["Tr", "mm", "minimax", "Trybula"]:  
-        a = np.sqrt( compACT.N_1 ) / compACT.compact_1.K
-        b = np.sqrt( compACT.N_2 ) / compACT.compact_2.K
-        dkl_estimate = Dirichlet( compACT, a, b, which=which )
+        a = np.sqrt( comp_div.N_1 ) / comp_div.compact_1.K
+        b = np.sqrt( comp_div.N_2 ) / comp_div.compact_2.K
+        divergence_estimate = Dirichlet( comp_div, a, b, which=which )
      
     elif method in ["Pe", "Perks", "SG", "Schurmann-Grassberger"]:
-        a = 1. / compACT.compact_1.Kobs
-        b = 1. / compACT.compact_2.Kobs
-        dkl_estimate = Dirichlet( compACT, a, b, which=which )
+        a = 1. / comp_div.compact_1.Kobs
+        b = 1. / comp_div.compact_2.Kobs
+        divergence_estimate = Dirichlet( comp_div, a, b, which=which )
 
     else:
-        raise IOError("Unkown method. Please choose `method` amongst :", _method_List_ )
+        raise IOError(f"Unkown method{method}\n Please choose method amongst the following:\n", _method_List_ )
 
-    return unit_conv * dkl_estimate
+    return unit_conv * divergence_estimate
 ###
 
 ###########
 #  NAIVE  #
 ###########
 
-def Naive( compACT, which="Kullback-Leibler", **kwargs) :
+def Naive( comp_div, which="Kullback-Leibler", **kwargs) :
     '''Estimation of divergence with frequencies of observed categories.'''
     
-    # loading parameters from compACT 
-    N_1, N_2 = compACT.N_1, compACT.N_2
+    # loading parameters from comp_div 
+    N_1, N_2 = comp_div.N_1, comp_div.N_2
     # delete 0 counts
-    gtr0mask = np.logical_and( compACT.nn_1 > 0, compACT.nn_2 > 0 )
-    nn_1, nn_2, ff = compACT.nn_1[gtr0mask], compACT.nn_2[gtr0mask], compACT.ff[gtr0mask]
+    gtr0mask = np.logical_and( comp_div.nn_1 > 0, comp_div.nn_2 > 0 )
+    nn_1, nn_2, ff = comp_div.nn_1[gtr0mask], comp_div.nn_2[gtr0mask], comp_div.ff[gtr0mask]
     
     hh_1 = nn_1 / N_1                  # frequencies
     hh_2 = nn_2 / N_2                  # frequencies
@@ -137,14 +148,49 @@ def Naive( compACT, which="Kullback-Leibler", **kwargs) :
     elif which == "Kullback-Leibler" :                       
         output = np.dot( ff, KullbackLeibler_oper( hh_1, hh_2 ) )
     
-    elif which == "symmetric-KL" :                       
+    elif which == "symmetrized-KL" :                       
         output = np.dot( ff, symmetric_KL_oper( hh_1, hh_2 ) )
 
-    elif which == "Hellinger" :  
-        output = np.sqrt( 1 - np.dot( ff, Bhattacharyya_oper( hh_1, hh_2 ) ) )
+    elif which == "squared-Hellinger" :  
+        output = 1 - np.dot( ff, Bhattacharyya_oper( hh_1, hh_2 ) )
 
     else :
         raise IOError("Unknown method `Naive` for the chosen divergence.")
+
+    return np.array( output )
+
+
+#####################
+#  ZHANG ESTIMATOR  #
+#####################
+
+def Zhang( comp_div, which="Kullback-Leibler", CPU_Count=None, **kwargs ) :
+    ''' Z estimator for the DKL.
+
+    Zhang, Z. & Grabchak, M. Nonparametric Estimation of Küllback-Leibler Divergence.
+    Neural Computation 26, 2570-2593 (2014).
+
+    resummed using :
+    Schürmann T. A Note on Entropy Estimation. 
+    Neural computation, 27(10), 2097-2106 (2015).
+    '''
+
+    # delete 0 counts in system 1 since those term contribution is 0
+    mask = comp_div.nn_1 > 0
+    nn_1, nn_2, ff = comp_div.nn_1[mask], comp_div.nn_2[mask], comp_div.ff[mask]
+    N_1, N_2 = comp_div.N_1, comp_div.N_2
+
+    if which == "Kullback-Leibler" : 
+        output = ff.dot( nn_1 * ( D_diGmm(N_2+1, nn_2+1) - D_diGmm(N_1, nn_1) ) ) / N_1
+
+    elif which == "symmetrized-KL" :  
+        output = 0.5 * ff.dot( nn_1 * ( D_diGmm(N_2+1, nn_2+1) - D_diGmm(N_1, nn_1) ) ) / N_1
+        mask = comp_div.nn_2 > 0
+        nn_1, nn_2, ff = comp_div.nn_1[mask], comp_div.nn_2[mask], comp_div.ff[mask]
+        output += 0.5 * ff.dot( nn_2 * ( D_diGmm(N_1+1, nn_1+1) - D_diGmm(N_2, nn_2) ) ) / N_2
+
+    else :
+        raise IOError("Unknown method `Zhang` for the chosen divergence.")
 
     return np.array( output )
 
@@ -152,11 +198,11 @@ def Naive( compACT, which="Kullback-Leibler", **kwargs) :
 #  DIRICHELET ESTIMATOR  #
 ##########################
 
-def Dirichlet( compACT, a, b, which="Kullback-Leibler", **kwargs ):
+def Dirichlet( comp_div, a, b, which="Kullback-Leibler", **kwargs ):
     '''Estimation of divergence with Dirichlet-multinomial pseudocount model.'''
     # check options
     if a == "optimal" :
-        a = optimal_dirichlet_param(compACT.compact_1)
+        a = optimal_dirichlet_param(comp_div.compact_1)
     else :
         try:
             a = np.float64(a)
@@ -166,7 +212,7 @@ def Dirichlet( compACT, a, b, which="Kullback-Leibler", **kwargs ):
             raise IOError('The concentration parameter `a` must greater than 0.')
 
     if b == "optimal" :
-        b = optimal_dirichlet_param(compACT.compact_2)
+        b = optimal_dirichlet_param(comp_div.compact_2)
     else :
         try:
             b = np.float64(b)
@@ -175,9 +221,9 @@ def Dirichlet( compACT, a, b, which="Kullback-Leibler", **kwargs ):
         if b < 0 :
             raise IOError('The concentration parameter `b` must greater than 0.')
 
-    # loading parameters from compACT 
-    N_1, N_2, K = compACT.N_1, compACT.N_2, compACT.K
-    nn_1, nn_2, ff = compACT.nn_1, compACT.nn_2, compACT.ff
+    # loading parameters from comp_div 
+    N_1, N_2, K = comp_div.N_1, comp_div.N_2, comp_div.K
+    nn_1, nn_2, ff = comp_div.nn_1, comp_div.nn_2, comp_div.ff
 
     hh_1_a = ( nn_1 + a ) / ( N_1 + K*a )     # frequencies with pseudocounts
     hh_2_b = ( nn_2 + b ) / ( N_2 + K*b )     # frequencies with pseudocounts
@@ -188,11 +234,11 @@ def Dirichlet( compACT, a, b, which="Kullback-Leibler", **kwargs ):
     elif which == "Kullback-Leibler" :                               
         output = np.dot( ff, KullbackLeibler_oper( hh_1_a, hh_2_b ) )
 
-    elif which == "symmetric-KL" :                       
+    elif which == "symmetrized-KL" :                       
         output = np.dot( ff, symmetric_KL_oper( hh_1_a, hh_2_b ) )
 
-    elif which == "Hellinger" :  
-        output = np.sqrt( 1 - np.dot( ff, Bhattacharyya_oper( hh_1_a, hh_2_b ) ) )
+    elif which == "squared-Hellinger" :  
+        output = 1 - np.dot( ff, Bhattacharyya_oper( hh_1_a, hh_2_b ) )
 
     else :
         raise IOError("Unknown method `Dirichlet` for the chosen quantity.")

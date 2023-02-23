@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Kullback-Leibler Divergence Estimator
+    Squared Hellinger Divergence Estimator
     Copyright (C) February 2023 Francesco Camaglia, LPENS 
 '''
 
@@ -10,39 +10,39 @@ import numpy as np
 from .udm_divergence import udm_estimator
 from .new_calculus import *
 
-class udm_Kullback_Leibler() :
-    ''' Auxiliary class to compute Kullback Leibler divergence UDM estimator.'''
+class udm_Hellinger() :
+    ''' Auxiliary class to compute squared Hellinger divergence UDM estimator.'''
     def __init__( self, comp_div, choice="log-uniform", scaling=1 ) :
         self.comp_div = comp_div
         self.choice = choice
         self.scaling = scaling
 
+    def equal_prior( self, a ) :
+        return None
+    
     def optimal_equal_param( self, ) :
-        return optimal_equal_KLdiv_param( self.comp_div )
+        return None
     
     def log_equal_evidence_hess( self, a ) :
-        return log_equal_KLdiv_meta_posterior_hess( a, self.comp_div)
+        return None
 
+    def udm_prior( self, var ) :
+        return DirHelldiv( var, self.comp_div.K, self.choice ).Metapr()
+    
     def optimal_divergence_params( self ) :
-        return optimal_KL_divergence_params( self.comp_div, choice=self.choice, scaling=self.scaling )
+        return optimal_Hellinger_params( self.comp_div, choice=self.choice, scaling=self.scaling )
     
     def log_evidence_hess( self, a, b ) :
-        return log_KL_divergence_meta_posterior_hess([a, b], self.comp_div, self.choice, {"scaling" : self.scaling})
+        return log_Hellinger_meta_posterior_hess([a, b], self.comp_div, self.choice, {"scaling" : self.scaling})
     
     def divergence( self, a, b ) :
-        return self.comp_div.kullback_leibler( a, b )
+        return self.comp_div.bhattacharrya( a, b )
     
     def squared_divergence( self, a, b ) :
-        return self.comp_div.squared_kullback_leibler( a, b )
-    
-    def udm_prior( self, var ) :
-        return DirKLdiv( var, self.comp_div.K, self.choice ).Metapr()
-
-    def equal_prior( self, a ) :
-        return equalDirKLdiv( a, self.comp_div.K ).aPrioriExpec()
+        return self.comp_div.squared_bhattacharrya( a, b )
     
     def estim_mean( self, DIV1 ) :
-        return DIV1
+        return 1 - DIV1
     
     def estim_std( self, DIV1, DIV2 ) :
         return np.sqrt( DIV2 - np.power( DIV1, 2 ) )
@@ -52,9 +52,13 @@ def main(
     choice="log-uniform", scaling=1.,
     cpu_count=None, verbose=False, 
     ) :
-    '''Kullback-Leibler divergence estimation with UDM method.'''
+    '''squared Hellinger divergence estimation with UDM method.'''
 
-    udm_wrap = udm_Kullback_Leibler( comp_div, choice=choice, scaling=scaling )
+    # FIXME : developer 
+    if equal_prior is True :
+        raise SystemError( "The options `equal_prior` is not available yet."  )
+
+    udm_wrap = udm_Hellinger( comp_div, choice=choice, scaling=scaling )
 
     output = udm_estimator( udm_wrap, 
                   error=error, n_bins=n_bins, 

@@ -9,7 +9,7 @@
 import warnings
 import numpy as np
 from scipy import optimize 
-from .beta_func_multivar import *
+from kamapack.beta_func_multivar import *
 
 N_SIGMA = 1.5
 MAX_ITER = 500
@@ -84,7 +84,7 @@ class _one_dim_metapr() :
     ''' Auxiliary class for transformation factor in determinant of the jacobian.'''
     def logMetapr( self ) :
         '''logarithm of the transformation factor.'''
-        return np.log(self.Metapr())
+        return np.log(self._sign * self.Metapr())
     def logMetapr_jac( self ) :
         '''1st derivative of the logarithm of the transformation factor.'''
         return self.Metapr_jac() / self.Metapr()
@@ -97,6 +97,7 @@ class DirEntr( _one_dim_metapr ) :
         '''Class for ``a priori`` expected Shannon entropy under symmetric Dirichlet prior.'''
         self.a = np.array(var)
         self.K = args[0] 
+        self._sign = 1
     def aPrioriExpec( self ) :
         '''``a priori`` expected Shannon entropy.'''
         return D_diGmm( self.K*self.a+1, self.a+1 )
@@ -114,7 +115,8 @@ class DirSimps( _one_dim_metapr ) :
     def __init__(self, var, *args) :
         '''Class for ``a priori`` expected Simpson index under symmetric Dirichlet prior.'''
         self.a = np.array(var)
-        self.K = args[0] 
+        self.K = args[0]  
+        self._sign = 1
     def aPrioriExpec( self ) :
         '''``a priori`` expected Simpson index.'''
         return (self.K-1) * np.power( self.K*self.a + 1, -2 )
@@ -133,7 +135,8 @@ class equalDirKLdiv( _one_dim_metapr ) :
         '''Class for ``a priori`` expected KL divergence under equal symmetric Dirichlet priors.'''
         self.a = np.array(var)
         self.K = args[0] 
-        self._const = (self.K - 1) / self.K
+        self._const = (self.K - 1) / self.K 
+        self._sign = 1
     def aPrioriExpec( self ) :
         '''``a priori`` expected KL divergence.'''
         return self._const * np.power( self.a, -1 )
@@ -151,19 +154,20 @@ class DirCrossEntr( _one_dim_metapr ) :
     def __init__(self, var, *args) :
         '''Class for ``a priori`` expected cross-entropy under symmetric Dirichlet prior.'''
         self.b = np.array(var)
-        self.K = args[0] 
+        self.K = args[0]  
+        self._sign = -1
     def aPrioriExpec( self ) :
         '''``a priori`` expected cross-entropy.'''
         return D_diGmm( self.K*self.b, self.b )
     def Metapr( self ) :
-        '''factor of transformation Jacobian determinant (i.e abs of 1st derivative) '''
-        return triGmm(self.b) - self.K * triGmm(self.K*self.b)
+        '''factor of transformation Jacobian determinant (NOTE: it must be taken abs of 1st derivative) '''
+        return self.K * triGmm(self.K*self.b) - triGmm(self.b)
     def Metapr_jac( self ) :
         '''1st derivative of the transformation factor.'''
-        return quadriGmm(self.b) - np.power(self.K, 2) * quadriGmm(self.K*self.b)
+        return np.power(self.K, 2) * quadriGmm(self.K*self.b) - quadriGmm(self.b)
     def Metapr_hess( self ) :
         '''2nd derivative of the transformation factor.'''
-        return quintiGmm(self.b) - np.power(self.K, 3) * quintiGmm(self.K*self.b)
+        return np.power(self.K, 3) * quintiGmm(self.K*self.b) - quintiGmm(self.b)
 
 ###########################
 #  2-DIM METAPRIOR TERMS  #
@@ -195,7 +199,7 @@ class _two_dim_metapr( ) :
     def divPrior( self, output ) :
         '''It returns the prior on the (2dim) a priori expected divrgence, rho(D).'''
         if self.choice in ["scaled"] :
-            output *= np.exp( - self._extra["scaling"] * ( self.D / self.class_A.aPrioriExpec() ) )
+            output *= np.exp( - self._extra["scaling"] * ( self.D / self.A ) )
         elif self.choice in ["uniform"] :
             output[ self.D >= CUTOFFRATIO * np.log(self.K) ] = NUMERICAL_ZERO
             # NOTE : no point in adding the normalization 1. / (CUTOFFRATIO * np.log(self.K))
@@ -206,7 +210,7 @@ class _two_dim_metapr( ) :
     def log_divPrior( self, output ) :
         '''It returns the logarithm of the D prior, log rho(D).'''
         if self.choice in ["scaled"] :
-            output += - self._extra["scaling"] * ( self.D / self.class_A.aPrioriExpec() )
+            output += - self._extra["scaling"] * ( self.D / self.A )
         elif self.choice in ["uniform"] :
             output[ self.D >= CUTOFFRATIO * np.log(self.K) ] = - NUMERICAL_INFTY 
             # NOTE CUTOFFRATIO > 1.
@@ -217,46 +221,44 @@ class _two_dim_metapr( ) :
     def log_divPrior_jac( self, output ) :
         '''It returns the gradient of the logarithm of the D prior,.'''
         if self.choice in ["scaled"] :
-            A = self.class_A.aPrioriExpec()
-            B = self.class_B.aPrioriExpec()
-            output[:,0] += self._extra["scaling"] * B * self.class_A.Metapr() * np.power(A, -2)
-            output[:,1] += self._extra["scaling"] * self.class_B.Metapr() / A
+            output[:,0] += self._extra["scaling"] * ( self.jac_a / self.A - self.D * self.class_A.Metapr() / self.A ) 
+            output[:,1] += self._extra["scaling"] * self.jac_b / self.A
         elif self.choice in ["uniform"] :
             mask = self.D < np.log(self.K)
             output[ ~mask,: ] = NUMERICAL_ZERO
             output[ self.D >= CUTOFFRATIO * np.log(self.K),: ] = - NUMERICAL_INFTY
         elif self.choice in ["log-uniform"] :
-            output[:,0] += self._extra["scaling"] * self.class_A.Metapr() / self.D
-            output[:,1] += self._extra["scaling"] * self.class_B.Metapr() / self.D
+            output[:,0] += - self._extra["scaling"] * self.jac_a / self.D
+            output[:,1] += - self._extra["scaling"] * self.jac_b / self.D
         return output
 
     def log_divPrior_hess( self, output ) :
         '''It returns the Hessian of the logarithm of the D prior,.'''
         if self.choice in ["scaled"] :
-            A = self.class_A.aPrioriExpec()
-            B = self.class_B.aPrioriExpec()
-            output[:,0,0] += self._extra["scaling"] * B * ( self.class_A.Metapr_jac() * np.power(A, -2) - 2 * np.power(self.class_A.Metapr(),2) * np.power(A,-3) ) 
-            aux_sym = - self._extra["scaling"] * self.class_B.Metapr() * self.class_A.Metapr() * np.power(A, -2)
-            output[:,0,1] += aux_sym
-            output[:,1,0] += aux_sym
-            output[:,1,1] += self._extra["scaling"] * self.class_B.Metapr_jac() / A
+            tmp = - self.hess_a() / self.A - 2 * self.D * np.power(self.class_A.Metapr(), 2) / np.power(self.A, 3) 
+            tmp += ( self.jac_a + self.jac_a * self.class_A.Metapr() + self.D * self.class_A.Metapr_jac() ) / np.power(self.A, 2) 
+            output[:,0,0] = self._extra["scaling"] * tmp
+            aux_sym = self.class_A.Metapr() * self.jac_b / np.power(self.A, 2) - self.hess_ab / self.A
+            output[:,0,1] += self._extra["scaling"] * aux_sym
+            output[:,1,0] += self._extra["scaling"] * aux_sym
+            output[:,1,1] += self.hess_b() / self.A
         elif self.choice in ["uniform"] :
             mask = self.D < np.log(self.K)
             output[ ~mask,:,: ] = NUMERICAL_ZERO
             output[ self.D >= CUTOFFRATIO * np.log(self.K),:,: ] = - NUMERICAL_INFTY
         elif self.choice in ["log-uniform"] :
-            output[:,0,0] += self._extra["scaling"] * self.class_A.Metapr_jac()/self.D + np.power(self.class_A.Metapr()/self.D,2)
-            aux_sym = self._extra["scaling"] * self.class_A.Metapr() * self.class_B.Metapr() / np.power(self.D,2)
+            output[:,0,0] += self._extra["scaling"] * np.power(self.jac_a/self.D, 2) - self.hess_a / self.D
+            aux_sym = self._extra["scaling"] * self.jac_a * self.jac_b / np.power(self.D, 2) - self.hess_ab / self.D
             output[:,0,1] += aux_sym
             output[:,1,0] += aux_sym
-            output[:,1,1] += self._extra["scaling"] * self.class_B.Metapr_jac()/self.D + np.power(self.class_B.Metapr()/self.D,2)
+            output[:,1,1] += self._extra["scaling"] * np.power(self.jac_b/self.D, 2) - self.hess_b / self.D
         return output
 
     def Metapr( self ) :
         ''' Complete Metaprior '''
         output = self.marginaliz_phi( _PRIOR_CHOICE[self.choice]["use_phi"] )
         output = self.divPrior( output )
-        output *= self.class_A.Metapr() * self.class_B.Metapr()
+        output *= self.class_A._sign * self.class_A.Metapr() * self.class_B._sign * self.class_B.Metapr() 
         return output
 
     def logMetapr( self ) :
@@ -291,8 +293,19 @@ class DirKLdiv( _two_dim_metapr ) :
         _two_dim_metapr.__init__(self, var, *args, **kwargs)
         self.class_A = DirEntr(self.a, self.K)
         self.class_B = DirCrossEntr(self.b, self.K)
-        self.D = self.class_B.aPrioriExpec() - self.class_A.aPrioriExpec()
 
+        # pre - computations aliases
+        self.A = self.class_A.aPrioriExpec()
+        self.B = self.class_B.aPrioriExpec()
+        self.jac_a = - self.class_A.Metapr()
+        self.hess_a = - self.class_A.Metapr_jac()
+        self.jac_b = self.class_B.Metapr()
+        self.hess_b = self.class_B.Metapr_jac()
+        self.hess_ab = 0.
+
+        # divergence
+        self.D = self.B - self.A
+    
     def marginaliz_phi( self, use_phi ) :
         output = np.ones( shape = (self.D.size,) )
         if use_phi is True :
@@ -313,66 +326,102 @@ class DirKLdiv( _two_dim_metapr ) :
         output = np.zeros( shape = (self.D.size, 2,) )
         if use_phi is True :
             mask = self.D < np.log(self.K)
-            output[mask,0] = self.class_A.Metapr() / self.D[mask]
-            output[mask,1] = self.class_B.Metapr() / self.D[mask]
+            output[mask,0] = - (self.jac_a / self.D)[mask]
+            output[mask,1] = - (self.jac_b / self.D)[mask]
         return output
 
     def log_marginaliz_phi_hess( self, use_phi ) : 
         output = np.zeros( shape = (self.D.size, 2, 2,) )
         if use_phi is True :
             mask = self.D < np.log(self.K)
-            output[mask,0,0] = self.class_A.Metapr_jac() / self.D[mask] + np.power( self.class_A.Metapr() / self.D[mask], 2 )
-            output[mask,0,1] = self.class_A.Metapr() * self.class_B.Metapr() / np.power( self.D[mask], 2 )
+            output[mask,0,0] = (np.power( self.jac_a / self.D, 2 ) - self.hess_a / self.D)[mask]
+            output[mask,0,1] = (self.jac_a * self.jac_b / np.power( self.D, 2 ))[mask]
             output[mask,1,0] = output[mask,0,1]
-            output[mask,1,1] = self.class_B.Metapr_jac() / self.D[mask] + np.power( self.class_B.Metapr() / self.D[mask], 2 )
+            output[mask,1,1] = (np.power(self.jac_b / self.D, 2) - self.hess_b / self.D)[mask]
         return output
 
 ####################################
 #  HELLINGER DIVERGENCE METAPRIOR  #
 ####################################
 
+def _log_auxfunc( x_i, X, K ) :
+    return 0.5 * np.log(K) + LogGmm(x_i+0.5) - LogGmm(x_i) + LogGmm(X) - LogGmm(X+0.5)
+
+class _Dir_Hell_auxfunc( _one_dim_metapr ) :
+    def __init__(self, var, *args) :
+        '''Class for ``a priori`` expected *** under symmetric Dirichlet prior.'''
+        self.a = np.array(var)
+        self.K = args[0] 
+        self._sign = 1
+    def aPrioriExpec( self ) :
+        '''``a priori`` expected ***.'''
+        return np.exp(_log_auxfunc( self.a, self.K*self.a, self.K ))
+    def Metapr( self ) :
+        '''factor of transformation Jacobian determinant (i.e abs of 1st derivative, NSB Metaprior) '''
+        tmp = self.K * D_diGmm( self.K*self.a, self.K*self.a+0.5 ) - D_diGmm( self.a, self.a+0.5 )
+        return tmp * self.aPrioriExpec()
+    def Metapr_jac( self ) :
+        '''1st derivative of the transformation factor.'''
+        tmp = np.power(self.K, 2) * D_triGmm( self.K*self.a, self.K*self.a+0.5 ) - D_triGmm( self.a, self.a+0.5 )
+        return  tmp * self.aPrioriExpec() + np.power(self.Metapr(),2) / self.aPrioriExpec()
+    def Metapr_hess( self ) :
+        '''2nd derivative of the transformation factor.'''
+        tmp = np.power(self.K, 3) * D_quadriGmm( self.K*self.a, self.K*self.a+0.5 ) - D_quadriGmm( self.a, self.a+0.5 )
+        tmp *= self.aPrioriExpec()
+        tmp += 2 * self.Metapr_jac() * self.Metapr() / self.aPrioriExpec()
+        tmp += - np.power( self.Metapr() / self.aPrioriExpec(), 2)
+        return tmp
+
 class DirHelldiv( _two_dim_metapr ) :
     def __init__(self, var, *args, **kwargs ) :
         _two_dim_metapr.__init__(self, var, *args, **kwargs)
-        self.class_A = DirEntr(self.a, self.K)
-        self.class_B = DirCrossEntr(self.b, self.K)
-        self.D = self.K * self.class_B.aPrioriExpec() * self.class_A.aPrioriExpec()
+        self.class_A = _Dir_Hell_auxfunc(self.a, self.K)
+        self.class_B = _Dir_Hell_auxfunc(self.b, self.K)
 
-        # FIXME
-        raise SystemError("this object needs to be coded.")
+        # pre - computations aliases
+        self.A = self.class_A.aPrioriExpec()
+        self.B = self.class_B.aPrioriExpec()
+        self.jac_a = self.class_A.Metapr() * self.B
+        self.hess_a = self.class_A.Metapr_jac() * self.B
+        self.jac_b = self.A * self.class_B.Metapr()
+        self.hess_b = self.A * self.class_B.Metapr_jac()
+        self.hess_ab = self.class_A.Metapr() * self.class_B.Metapr()
 
+        # divergence
+        self.D = self.class_B.aPrioriExpec() * self.class_A.aPrioriExpec()
+    
     def marginaliz_phi( self, use_phi ) :
-        output = np.ones( shape = (self.D.size,) )
         if use_phi is True :
-            mask = self.D < np.log(self.K)
-            output[ mask ] /= self.D[ mask ]
-            output[ ~mask ] /= np.log(self.K)
+            output = np.exp(self.log_marginaliz_phi(use_phi=True))
+        else :
+            output = np.ones( shape=(self.D.size,) )
         return output
-
+    
     def log_marginaliz_phi( self, use_phi ) :
-        output = np.zeros( shape = (self.D.size,) )
         if use_phi is True :
-            mask = self.D < np.log(self.K) 
-            output[ mask ] = - np.log( self.D[mask] )
-            output[ ~mask ] = - np.log( np.log(self.K ))
+            output = 2 * np.log( 1 - self.D ) - np.log( self.D ) - np.log( 2 - self.D )
+        else :
+            output = np.ones( shape=(self.D.size,) )
         return output
 
     def log_marginaliz_phi_jac( self, use_phi ) : 
         output = np.zeros( shape = (self.D.size, 2,) )
         if use_phi is True :
-            mask = self.D < np.log(self.K)
-            output[mask,0] = self.class_A.Metapr() / self.D[mask]
-            output[mask,1] = self.class_B.Metapr() / self.D[mask]
+            tmp = - 2 * np.power( 1-self.D, -1 ) - np.power( self.D, -1 ) + np.power( 2-self.D, -1 )
+            output[:,0] = tmp * self.jac_a
+            output[:,1] = tmp * self.jac_b            
         return output
 
     def log_marginaliz_phi_hess( self, use_phi ) : 
         output = np.zeros( shape = (self.D.size, 2, 2,) )
         if use_phi is True :
-            mask = self.D < np.log(self.K)
-            output[mask,0,0] = self.class_A.Metapr_jac() / self.D[mask] + np.power( self.class_A.Metapr() / self.D[mask], 2 )
-            output[mask,0,1] = self.class_A.Metapr() * self.class_B.Metapr() / np.power( self.D[mask], 2 )
-            output[mask,1,0] = output[mask,0,1]
-            output[mask,1,1] = self.class_B.Metapr_jac() / self.D[mask] + np.power( self.class_B.Metapr() / self.D[mask], 2 )
+            # HERE FIXME
+            tmp = - 2 * np.power( 1-self.D, -1 ) - np.power( self.D, -1 ) + np.power( 2-self.D, -1 )
+            tmp_2 = 2 * np.power( 1-self.D, -2 ) + np.power( self.D, -2 ) - np.power( 2-self.D, -2 )
+            output[:,0,0] = tmp * self.hess_a + tmp_2 * self.jac_a
+            output[:,0,1] = self.jac_a * self.jac_b
+            output[:,1,0] = output[:,0,1]
+            output[:,1,1] = tmp * self.hess_b + tmp_2 * self.jac_b
         return output
 
 # <<<<<<<<<<<<<<<<<<<<<<
@@ -421,11 +470,11 @@ def optimal_entropy_param( compExp ) :
 def optimal_crossentropy_param( compExp ) :
     '''(obsolete)''' 
     def myfunc(var, *args) :
-        LogLike = DirCrossEntr(var, args[0].K).logMetapr()
+        LogLike = - DirCrossEntr(var, args[0].K).logMetapr()
         LogLike += Polya(var, *args).log()
         return - LogLike
     def myjac(var, *args) :
-        jac_LogLike = DirCrossEntr(var, args[0].K).logMetapr_jac()
+        jac_LogLike = - DirCrossEntr(var, args[0].K).logMetapr_jac()
         jac_LogLike += Polya(var, *args).log_jac()
         return - jac_LogLike
     return myMinimizer( myfunc, [INIT_GUESS], (compExp,), jac=myjac )
@@ -517,48 +566,10 @@ def log_KL_divergence_meta_posterior_hess( var, *args ) :
     hess_LogLike[:,0,0] += Polya(var[0], args[0].compact_1).log_hess()
     hess_LogLike[:,1,1] += Polya(var[1], args[0].compact_2).log_hess() 
     return hess_LogLike
-    
 
-# -----------------------------------   
-
-# IN DEVELOPMENT
-# SIMPSON, EQUAL PRIOR
-
-# -----------------------------------
-
-'''
-
-def prior_simpson_vs_alpha_( alpha, K ):
-    Expected Simpson for Dirichlet distribution.
-    return (alpha + 1) / (K * alpha + 1)
-
-def prior_bhattacharrya_( alpha, beta, K ) :
-    A priori expected Bhattacharrya under symmetricDirichlet Mixture.
-    return K * (beta_func(0.5,K*alpha)/beta_func(0.5,alpha)) * (beta_func(0.5,K*beta)/beta_func(0.5,beta))
-
-def optimal_simpson_param_( compExp ) :
-    def myfunc(var, *args) :
-        alpha = var
-        compExp = args[0]
-        K = compExp.K
-        metaprior = (K-1) / np.power( K*alpha + 1, 2 )
-        Like = log_alphaPosterior(var, *args) + np.log(metaprior)
-        return - Like
-    return myMinimizer( myfunc, [INIT_GUESS], (compExp,) )
-
-def optimal_dirichlet_EP_param_( compDiv ) :
-    def myfunc( var, *args ) :
-        compExp_1, compExp_2, = args[0].compact_1,  args[0].compact_2
-        Like = log_alphaPosterior(var, (compExp_1,)) + log_alphaPosterior(var, (compExp_2,))
-        return - Like
-    return myMinimizer( myfunc, [INIT_GUESS], (compDiv,) )
-
-def optimal_divergence_EP_param_( compDiv ) :
-    def myfunc( var, *args ) :
-        compExp_1, compExp_2, = args[0].compact_1,  args[0].compact_2
-        K = args[0].K
-        logMetaprior = np.log( ( 1. - 1. / K ) / var**2 )
-        Like = log_alphaPosterior(var, (compExp_1,)) + log_alphaPosterior(var, (compExp_2,)) + logMetaprior
-        return - Like
-    return myMinimizer( myfunc, [INIT_GUESS], (compDiv,) )
-'''
+def log_Hellinger_meta_posterior_hess( var, *args ) :
+    '''.'''
+    hess_LogLike = DirHelldiv(var, args[0].K, args[1], ** args[2] ).logMetapr_hess()
+    hess_LogLike[:,0,0] += Polya(var[0], args[0].compact_1).log_hess()
+    hess_LogLike[:,1,1] += Polya(var[1], args[0].compact_2).log_hess() 
+    return hess_LogLike
