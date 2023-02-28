@@ -515,7 +515,7 @@ class markov_class() :
     def generate_counts( self, size, seed=None ) :
         '''Generate histogram of `size` counts from the Markov chain itslef.'''
 
-        return data_generator( data_hist_gen, size, self.pmf() )
+        return data_generator( data_hist_gen, size, self.pmf(), seed=seed )
 
     def exact_shannon( self, ) :
         '''exact Shannon entropy with stationary state as initial.'''
