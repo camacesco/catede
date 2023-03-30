@@ -1,13 +1,30 @@
 Metadata-Version: 2.1
-Name: kamapack
-Version: 0.0.20
+Name: catede
+Version: 0.0.22
 Summary: Python package for entropy and divergence estimation.
-Home-page: https://github.com/camacesco/kamapack
+Home-page: https://github.com/camacesco/catede
 Author: Francesco Camaglia
 Author-email: francesco.camaglia@phys.ens.fr
 License: GNU GPLv3
-Description: # kamapack
-        
 Platform: UNKNOWN
 Requires-Python: >=3.5
 Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# _catede_
+
+The python software _catede_ is a collection of different estimation methods for the entropy and divergence in the context of categorical distribution with finite number of categories.
+Provided a data sample in the shape of a list or other comprehensive supported formats, the software provides methods to estimate the Shannon entropy, the Simpson index, the Kullback-Leibler divergence and the Hellinger distance.
+In particular it provides the code for the Dirichlet prior mixture estimators for the divergence, presented in `Missing Paper`.
+
+![](docs/source/kullback-leibler-dirichlet-scheme.png)
+
+## Installation
+
+The package _catede_ can be installed by using the setup.py script :
+
+ ```python setup.py install```.
+
+ ## References
+
+

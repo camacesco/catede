@@ -26,7 +26,7 @@ _method_List_ = [
     "La", "Laplace", 
     "Tr", "minimax", "Trybula", 
     "Pe", "Perks",
-    "Schurmann-Grassberger", 
+    "SG", "Schurmann-Grassberger", 
 ]
 
 _which_List_ = ["Shannon", "Simpson"]
@@ -110,7 +110,7 @@ def switchboard( compExp, method="naive", which="Shannon", unit="default", **kwa
         a = 1. / compExp.Kobs
         estimate = Dirichlet( compExp, a, which=which, **kwargs )
         
-    elif method in ["Tr", "Trybula", "mm", "minimax"]:
+    elif method in ["Tr", "Trybula", "minimax"]:
         a = np.sqrt( compExp.N ) / compExp.K
         estimate = Dirichlet( compExp, a, which=which, **kwargs )
 
@@ -124,7 +124,7 @@ def switchboard( compExp, method="naive", which="Shannon", unit="default", **kwa
 #  NAIVE ESTIMATOR  #
 #####################
 
-def Naive( compExp, which ):
+def Naive( compExp, which="Shannon", ):
     '''Entropy estimation (naive).'''
 
     # loading parameters from compExp 
@@ -150,7 +150,7 @@ def Naive( compExp, which ):
 #  MILLER MADOW ESTIMATOR  #
 ############################
 
-def MillerMadow( compExp, which, ): 
+def MillerMadow( compExp, which="Shannon", ): 
     '''Entropy estimation with Miller-Madow bias correction.
     
     ref:
@@ -175,7 +175,7 @@ def MillerMadow( compExp, which, ):
 #  SCHURMANN-GRASSBERGER ESTIMATOR  #
 #####################################
 
-def Schurmann_Grassberger( compExp, which, ): 
+def Schurmann_Grassberger( compExp, which="Shannon", ): 
     '''Entropy estimation with Schurmann-Grassberge method.
     
     ref:
