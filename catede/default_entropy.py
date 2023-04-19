@@ -19,14 +19,15 @@ import warnings
 _method_List_ = [
     "naive",
     "NSB", "Nemenmann-Shafee-Bialek",
-    "CS", "Chao-Shen", "CAE",
+    "CS", "Chao-Shen", 
     "Di", "Dirichlet", 
-    "Je", "Jeffreys", "Krichevsky-Trofimov", 
+    "Je", "Jeffreys",
     "MM", "Miller-Madow", 
     "La", "Laplace", 
     "Tr", "minimax", "Trybula", 
     "Pe", "Perks",
     "SG", "Schurmann-Grassberger", 
+    "max_evidence",
 ]
 
 _which_List_ = ["Shannon", "Simpson"]
@@ -84,7 +85,7 @@ def switchboard( compExp, method="naive", which="Shannon", unit="default", **kwa
     elif method in ["MM", "Miller-Madow"]:  
         estimate = MillerMadow( compExp, which=which, **kwargs )
         
-    elif method in ["CS", "CAE", "Chao-Shen"] :        
+    elif method in ["CS", "Chao-Shen"] :        
         estimate = ChaoShen( compExp, which=which, **kwargs )
 
     elif method in ["SG", "Schurmann-Grassberger"] :
@@ -96,13 +97,16 @@ def switchboard( compExp, method="naive", which="Shannon", unit="default", **kwa
             #warnings.warn("Dirichlet parameter `a` set to optimal.")
         else :
             a = kwargs['a']
-        estimate = Dirichlet( compExp, a, which=which, **kwargs )       
-        
-    elif method in ["La", "Laplace", "Bayesian-Laplace"] :
+        estimate = Dirichlet( compExp, a, which=which, **kwargs ) 
+
+    elif method in ["max_evidence"] :
+        estimate = max_evidence( compExp, which=which, **kwargs )   
+
+    elif method in ["La", "Laplace"] :
         a = 1.
         estimate = Dirichlet( compExp, a, which=which, **kwargs )
 
-    elif method in ["Je", "Jeffreys", "Krichevsky-Trofimov"] :
+    elif method in ["Je", "Jeffreys"] :
         a = 0.5
         estimate = Dirichlet( compExp, a, which=which, **kwargs )
 
@@ -159,10 +163,10 @@ def MillerMadow( compExp, which="Shannon", ):
 
     
     # loading parameters from compExp 
-    N, Kobs = compExp.N, compExp.Kobs
+    N, K = compExp.N, compExp.K
 
     if which == "Shannon" :
-        output = Naive( compExp, which="Shannon" ) + 0.5 * ( Kobs - 1 ) / N
+        output = Naive( compExp, which="Shannon" ) + 0.5 * ( K - 1 ) / N
 
     else :
         raise IOError("FIXME: place holder.")
@@ -176,7 +180,7 @@ def MillerMadow( compExp, which="Shannon", ):
 #####################################
 
 def Schurmann_Grassberger( compExp, which="Shannon", ): 
-    '''Entropy estimation with Schurmann-Grassberge method.
+    '''Entropy estimation with Schurmann-Grassberger method.
     
     ref:
     Schürmann, T. Bias analysis in entropy estimation. 
@@ -186,6 +190,8 @@ def Schurmann_Grassberger( compExp, which="Shannon", ):
     # loading parameters from compExp 
     N = compExp.N
     nn, ff = compExp.nn, compExp.ff
+    # delete 0 counts (if present they are at position 0)
+    if 0 in nn : nn, ff = nn[1:], ff[1:]    
 
     if which == "Shannon" :
         output = ff.dot( nn * D_diGmm(N, nn) ) / N
@@ -201,7 +207,12 @@ def Schurmann_Grassberger( compExp, which="Shannon", ):
 #########################
 
 def _GoodTuring_coverage( nn, ff ) :
-    '''Good-Turing frequency estimation with Zhang-Huang formulation.'''
+    '''Good-Turing frequency estimation with Zhang-Huang formulation.
+    
+    ref:
+    Zhang, Z. & Huang, H. Turing’s formula revisited*.
+    Journal of Quantitative Linguistics 14, 222-241 (2007).
+    '''
 
     N = np.dot( nn, ff )
     # Check for the pathological case of all singletons (to avoid coverage = 0)
@@ -211,8 +222,8 @@ def _GoodTuring_coverage( nn, ff ) :
         GoodTuring = ( N - 1 ) / N                                  
     else :
         sign = np.power( -1, nn + 1 )
-        binom = list( map( lambda k : 1. / comb(N,k), nn ) )
-        GoodTuring = np.sum( sign * binom * ff )
+        binom = 1. / comb(N,nn)
+        GoodTuring = ff.dot( sign * binom )
         
     return 1. - GoodTuring
 
@@ -285,6 +296,32 @@ def Dirichlet( compExp, a, which="Shannon", ):
     elif which == "Simpson" :  
         output = np.dot( ff, Simpson_oper( hh_a ) )
 
+    else :
+        raise IOError("Unknown method `Dirichlet` for the chosen quantity.")
+
+    return np.array( output )
+###
+
+##################
+#  MAX EVIDENCE  #
+##################
+
+def max_evidence( compExp, which="Shannon", error=False ):
+    '''Expected entropy with Dirichlet-multinomial at maximum evidence.
+
+    '''
+    a_star = optimal_dirichlet_param( compExp )
+    if which == "Shannon" :
+        output = compExp.entropy( a_star )
+        if error == True :
+            tmp = compExp.squared_entropy( a_star )
+            output = [ output, np.sqrt(tmp - output**2) ]
+
+    elif which == "Simpson" :  
+        output = compExp.simpson( a_star )
+        if error == True :
+            tmp = compExp.squared_simpson( a_star )
+            output = [ output, np.sqrt(tmp - output**2) ]
     else :
         raise IOError("Unknown method `Dirichlet` for the chosen quantity.")
 

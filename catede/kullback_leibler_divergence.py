@@ -7,10 +7,10 @@
 '''
 
 import numpy as np
-from .udm_divergence import udm_estimator
+from .dpm_divergence import dpm_estimator
 from .new_calculus import *
 
-class udm_Kullback_Leibler() :
+class dpm_Kullback_Leibler() :
     ''' Auxiliary class to compute Kullback Leibler divergence UDM estimator.'''
     def __init__( self, comp_div, choice="log-uniform", scaling=1 ) :
         self.comp_div = comp_div
@@ -35,7 +35,7 @@ class udm_Kullback_Leibler() :
     def squared_divergence( self, a, b ) :
         return self.comp_div.squared_kullback_leibler( a, b )
     
-    def udm_prior( self, var ) :
+    def dpm_prior( self, var ) :
         return DirKLdiv( var, self.comp_div.K, self.choice ).Metapr()
 
     def equal_prior( self, a ) :
@@ -54,9 +54,9 @@ def main(
     ) :
     '''Kullback-Leibler divergence estimation with UDM method.'''
 
-    udm_wrap = udm_Kullback_Leibler( comp_div, choice=choice, scaling=scaling )
+    dpm_wrap = dpm_Kullback_Leibler( comp_div, choice=choice, scaling=scaling )
 
-    output = udm_estimator( udm_wrap, 
+    output = dpm_estimator( dpm_wrap, 
                   error=error, n_bins=n_bins, 
                   equal_prior=equal_prior, cpu_count=cpu_count, verbose=verbose,
                   )

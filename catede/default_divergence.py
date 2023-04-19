@@ -17,13 +17,14 @@ from .beta_func_multivar import D_diGmm
 
 _method_List_ = [
     "naive", "maximum-likelihood",
-    "CMW", "Camaglia-Mora-Walczak", # FIXME : WARNING : this needs to be changed
+    "DPM", 
     "Zh", "Zhang-Grabchak",
     "Di", "Dirichlet", 
     "Je", "Jeffreys", 
     "La", "Laplace", 
     "Tr", "mm", "minimax", "Trybula", 
     "Pe", "Perks",
+    "max_evidence",
 ]
 
 _which_List_ = ["squared-Hellinger", "Jensen-Shannon", "Kullback-Leibler", "symmetrized-KL"]
@@ -71,7 +72,7 @@ def switchboard( comp_div, method="naive", which="Kullback-Leibler", unit="defau
     if method in ["naive", "maximum-likelihood"] :  
         divergence_estimate = Naive( comp_div, which=which, **kwargs )
     
-    elif method in ["CMW", "Camaglia-Mora-Walczak"] :       
+    elif method in ["DPM"] :       
         if which in ["Jensen-Shannon"] :
             raise IOError(f"Unknown method `{method}` for {which}.")
         elif which == "Kullback-Leibler" :
@@ -98,8 +99,11 @@ def switchboard( comp_div, method="naive", which="Kullback-Leibler", unit="defau
             b = "optimal"
             #warnings.warn("Dirichlet parameter `b` falling back to `optimal`.")
 
-        divergence_estimate = Dirichlet( comp_div, a, b, which=which )       
-    
+        divergence_estimate = Dirichlet( comp_div, a, b, which=which )  
+
+    elif method in ["max_evidence"] :
+        divergence_estimate = max_evidence( comp_div, which=which, **kwargs )
+
     elif method in ["Je", "Jeffreys", "Krichevsky-Trofimov"] :
         a = 0.5
         b = 0.5
@@ -195,7 +199,7 @@ def Zhang( comp_div, which="Kullback-Leibler", CPU_Count=None, **kwargs ) :
     return np.array( output )
 
 ##########################
-#  DIRICHELET ESTIMATOR  #
+#  DIRICHLET ESTIMATOR  #
 ##########################
 
 def Dirichlet( comp_div, a, b, which="Kullback-Leibler", **kwargs ):
@@ -239,6 +243,38 @@ def Dirichlet( comp_div, a, b, which="Kullback-Leibler", **kwargs ):
 
     elif which == "squared-Hellinger" :  
         output = 1 - np.dot( ff, Bhattacharyya_oper( hh_1_a, hh_2_b ) )
+
+    else :
+        raise IOError("Unknown method `Dirichlet` for the chosen quantity.")
+
+    return np.array( output )
+###
+
+
+##########################
+#  MAX_EVIDENCE  #
+##########################
+
+def max_evidence( comp_div, which="Kullback-Leibler", error=False, ):
+    '''Estimation of divergence with Dirichlet-multinomial pseudocount model.'''
+    a_star = optimal_dirichlet_param(comp_div.compact_1)
+    b_star = optimal_dirichlet_param(comp_div.compact_2)
+
+    if which == "Kullback-Leibler" :                               
+        output = comp_div.kullback_leibler( a_star, b_star )
+        if error == True :
+            tmp = comp_div.squared_kullback_leibler( a_star, b_star )
+            output = [ output, np.sqrt(tmp-output**2) ]
+
+    elif which == "symmetrized-KL" :                       
+        raise SystemError("To be coded...")
+
+    elif which == "squared-Hellinger" :  
+        tmp1 = comp_div.bhattacharyya( a_star, b_star )
+        output = 1 - tmp1
+        if error == True :
+            tmp2 = comp_div.squared_bhattacharyya( a_star, b_star )
+            output = [ output, np.sqrt(tmp2-tmp1**2) ]
 
     else :
         raise IOError("Unknown method `Dirichlet` for the chosen quantity.")

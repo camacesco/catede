@@ -340,8 +340,8 @@ class Divergence_Compact :
 
         return self.compact_1._norm_ffsum( sumGens, a, dim=2 )
 
-    def bhattacharrya( self, a, b ) :
-        '''Posterior Bhattacharrya coefficient estimator.
+    def bhattacharyya( self, a, b ) :
+        '''Posterior Bhattacharyya coefficient estimator.
             sum_i < sqrt{q_i} sqrt{t_i} | n, m ; a, b > 
         '''
         sumGens_Qh = self.compact_1._hash_Omega( "i", a )
@@ -351,8 +351,8 @@ class Divergence_Compact :
 
         return  self.compact_1._ffsum( sumGens, dim=1 )
 
-    def squared_bhattacharrya( self, a, b ) :
-        '''Posterior Bhattacharrya coefficient estimator.
+    def squared_bhattacharyya( self, a, b ) :
+        '''Posterior Bhattacharyya coefficient estimator.
             sum_ij < sqrt{q_i} sqrt{q_j} sqrt{t_i} sqrt{t_j} | n, m ; a, b > 
         '''
         sumGens_Qh2 = self.compact_1._hash_Omega( "ij", a )

@@ -268,28 +268,51 @@ class Divergence( Skeleton_Class ) :
         counts_2 = tmp[["freq", "Exp-2"]].set_index("Exp-2", drop=True)
         self.exp_2.counts_hist = counts_2["freq"]
 
+
+    def compact( self ) :
+        '''It provides aliases for computations.'''
+        return Divergence_Compact( self )
+
+    def save( self, filename, compression="gzip" ) : 
+        '''It saves the Divergence object to `filename`.'''
+        outFrame = self.data_hist.copy()
+        add_ons = pd.Series(
+            {"Exp-1" : self.exp_1.usr_n_categ, "Exp-2" : self.exp_2.usr_n_categ}, 
+            name="__usr_n_categ__"
+            )
+        outFrame = outFrame.append( add_ons )
+        outFrame.to_csv( filename, sep=' ', mode='w', header=True, index=True, compression=compression )
+        
+    def save_compact( self, filename ) :
+        '''It saves the compact version of Divergence to `filename`.'''
+        self.compact( )._save( filename )
+
+    '''
+    Divergence methods.
+
+    Parameters
+    ----------
+    method: str
+        the name of the estimation method:
+        - ["naive", "maximum-likelihood"] : naive estimator (default);
+        - "DPM" : Camaglia Mora Walczak estimator.
+        - ["Jeffreys", "Krichevsky-Trofimov"] : Jeffreys estimator;
+        - ["L", "Laplace", "Bayesian-Laplace"] : Laplace estimator;
+        - ["SG", "Schurmann-Grassberger"] : Schurmann-Grassberger estimator;
+        - ["minimax", "Trybula"] : minimax estimator; 
+        - ["D", "Dirichlet"] : Dirichlet   
+    unit: str, optional
+        the divergence logbase unit:
+        - "ln": natural logarithm (default);
+        - "log2": base 2 logarihtm;
+        - "log10":base 10 logarithm.
+        '''
+
     def kullback_leibler( self, method="naive", unit="ln", **kwargs ):
         '''Estimate Kullback-Leibler divergence.
 
         Kullback-Leibler divergence estimation through a chosen `method`.
         The unit (of the logarithm) can be specified with the parameter `unit`.
-            
-        Parameters
-        ----------
-        method: str
-            the name of the estimation method:
-            - ["naive", "maximum-likelihood"] : naive estimator (default);
-            - "CMW" : Camaglia Mora Walczak estimator.
-            - ["Jeffreys", "Krichevsky-Trofimov"] : Jeffreys estimator;
-            - ["L", "Laplace", "Bayesian-Laplace"] : Laplace estimator;
-            - ["SG", "Schurmann-Grassberger"] : Schurmann-Grassberger estimator;
-            - ["minimax", "Trybula"] : minimax estimator; 
-            - ["D", "Dirichlet"] : Dirichlet   
-        unit: str, optional
-            the divergence logbase unit:
-            - "ln": natural logarithm (default);
-            - "log2": base 2 logarihtm;
-            - "log10":base 10 logarithm.
 
         return numpy.array
         '''
@@ -329,23 +352,7 @@ class Divergence( Skeleton_Class ) :
         
         return default_divergence.switchboard( self.compact(), method=method, which="squared-Hellinger", **kwargs )
 
-    def compact( self ) :
-        '''It provides aliases for computations.'''
-        return Divergence_Compact( self )
 
-    def save( self, filename, compression="gzip" ) : 
-        '''Save the Divergence object to `filename`.'''
-        outFrame = self.data_hist.copy()
-        add_ons = pd.Series(
-            {"Exp-1" : self.exp_1.usr_n_categ, "Exp-2" : self.exp_2.usr_n_categ}, 
-            name="__usr_n_categ__"
-            )
-        outFrame = outFrame.append( add_ons )
-        outFrame.to_csv( filename, sep=' ', mode='w', header=True, index=True, compression=compression )
-        
-    def save_compact( self, filename ) :
-        '''It saves the compact version of Divergence to `filename`.'''
-        self.compact( )._save( filename )
 
 def load_diver( filename ) :
     '''  Load the Divergence object stored in `filename`. '''

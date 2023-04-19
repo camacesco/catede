@@ -14,8 +14,8 @@ import multiprocessing
 from tqdm import tqdm
 from .new_calculus import *
 
-def udm_estimator( udm_wrap, error=False, n_bins="default", equal_prior=False, cpu_count=None, verbose=False, ) :
-    '''Divergence estimator with UDM method.'''
+def dpm_estimator( dpm_wrap, error=False, n_bins="default", equal_prior=False, cpu_count=None, verbose=False, ) :
+    '''Divergence estimator with DPM method.'''
 
     # >>>>>>>>>>>>>>>>>>>>>>
     #  CHECK user OPTIONS  #
@@ -30,7 +30,7 @@ def udm_estimator( udm_wrap, error=False, n_bins="default", equal_prior=False, c
     # number of bins
     #
     if n_bins == "default" :
-        n_bins = empirical_n_bins( min(udm_wrap.comp_div.N_1, udm_wrap.comp_div.N_2), udm_wrap.comp_div.K )
+        n_bins = empirical_n_bins( min(dpm_wrap.comp_div.N_1, dpm_wrap.comp_div.N_2), dpm_wrap.comp_div.K )
         if verbose is True :
            warnings.warn("The precision is chosen by default.")
     try :
@@ -62,9 +62,9 @@ def udm_estimator( udm_wrap, error=False, n_bins="default", equal_prior=False, c
 
     #  Find Point of maximum evidence #   
     if equal_prior is True :
-        a_star = udm_wrap.optimal_equal_param( )
+        a_star = dpm_wrap.optimal_equal_param( )
     else :
-        a_star, b_star = udm_wrap.optimal_divergence_params( )
+        a_star, b_star = dpm_wrap.optimal_divergence_params( )
 
     if saddle_point_method is True :
 
@@ -73,13 +73,13 @@ def udm_estimator( udm_wrap, error=False, n_bins="default", equal_prior=False, c
         # 
 
         if equal_prior is True :
-            DIV1= udm_wrap.divergence( a_star, a_star )
+            DIV1= dpm_wrap.divergence( a_star, a_star )
             if error is True :
-                DIV2 = udm_wrap.squared_divergence( a_star, a_star )
+                DIV2 = dpm_wrap.squared_divergence( a_star, a_star )
         else :
-            DIV1= udm_wrap.divergence( a_star, b_star )
+            DIV1= dpm_wrap.divergence( a_star, b_star )
             if error is True :
-                DIV2 = udm_wrap.squared_divergence( a_star, b_star )
+                DIV2 = dpm_wrap.squared_divergence( a_star, b_star )
     else :    
 
         # 
@@ -91,27 +91,27 @@ def udm_estimator( udm_wrap, error=False, n_bins="default", equal_prior=False, c
         # and vectorialized
 
         if equal_prior is True :
-            Log_evidence_hess = udm_wrap.log_equal_evidence_hess( a_star )
+            Log_evidence_hess = dpm_wrap.log_equal_evidence_hess( a_star )
             std_a = np.power( - Log_evidence_hess, -0.5 )
             # alpha
             alpha_vec = centered_logspaced_binning( a_star, std_a, n_bins )
-            log_mu_alpha = list(map(lambda a : Polya(a, udm_wrap.comp_div.compact_1).log() + Polya(a, udm_wrap.comp_div.compact_2).log(), alpha_vec ))   
+            log_mu_alpha = list(map(lambda a : Polya(a, dpm_wrap.comp_div.compact_1).log() + Polya(a, dpm_wrap.comp_div.compact_2).log(), alpha_vec ))   
             log_mu_alpha -= np.max( log_mu_alpha ) # regularization
             mu_alpha = np.exp( log_mu_alpha )
 
         else :
             
-            Log_evidence_hess = udm_wrap.log_evidence_hess( a_star, b_star )
+            Log_evidence_hess = dpm_wrap.log_evidence_hess( a_star, b_star )
             std_a = np.power( - Log_evidence_hess[:,0,0], -0.5 )
             std_b = np.power( - Log_evidence_hess[:,1,1], -0.5 )
             # alpha
             alpha_vec = centered_logspaced_binning( a_star, std_a, n_bins )
-            log_mu_alpha = list(map(lambda a : Polya(a, udm_wrap.comp_div.compact_1).log(), alpha_vec ))   
+            log_mu_alpha = list(map(lambda a : Polya(a, dpm_wrap.comp_div.compact_1).log(), alpha_vec ))   
             log_mu_alpha -= np.max( log_mu_alpha ) # regularization
             mu_alpha = np.exp( log_mu_alpha )
             # beta
             beta_vec = centered_logspaced_binning( b_star, std_b, n_bins )
-            log_mu_beta = list(map(lambda b : Polya(b, udm_wrap.comp_div.compact_2).log(), beta_vec )) 
+            log_mu_beta = list(map(lambda b : Polya(b, dpm_wrap.comp_div.compact_2).log(), beta_vec )) 
             log_mu_beta -= np.max( log_mu_beta ) # regularization
             mu_beta = np.exp( log_mu_beta )
 
@@ -125,12 +125,12 @@ def udm_estimator( udm_wrap, error=False, n_bins="default", equal_prior=False, c
         if equal_prior is True :
             args = [ x for x in zip( alpha_vec, alpha_vec ) ]
             tqdm_args = tqdm( args, total=len(args), desc='Evaluations...', disable=disable )
-            all_DIV_a = POOL.starmap( udm_wrap.divergence, tqdm_args )
+            all_DIV_a = POOL.starmap( dpm_wrap.divergence, tqdm_args )
 
         else :
             args = [ x for x in itertools.product( alpha_vec, beta_vec ) ]
             tqdm_args = tqdm( args, total=len(args), desc='Evaluations...', disable=disable )
-            all_DIV_ab = POOL.starmap( udm_wrap.divergence, tqdm_args )
+            all_DIV_ab = POOL.starmap( dpm_wrap.divergence, tqdm_args )
             all_DIV_ab = np.asarray( all_DIV_ab ).reshape( len(alpha_vec), len(beta_vec) )
     
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -140,9 +140,9 @@ def udm_estimator( udm_wrap, error=False, n_bins="default", equal_prior=False, c
         if error is True :
             tqdm_args = tqdm(args, total=len(args), desc='Squared...', disable=disable)
             if equal_prior is True :
-                all_DIV2_a = POOL.starmap( udm_wrap.squared_divergence, tqdm_args )
+                all_DIV2_a = POOL.starmap( dpm_wrap.squared_divergence, tqdm_args )
             else :
-                all_DIV2_ab = POOL.starmap( udm_wrap.squared_divergence, tqdm_args )
+                all_DIV2_ab = POOL.starmap( dpm_wrap.squared_divergence, tqdm_args )
                 all_DIV2_ab = np.asarray( all_DIV2_ab ).reshape( len(alpha_vec), len(beta_vec) )
 
         POOL.close()
@@ -153,7 +153,7 @@ def udm_estimator( udm_wrap, error=False, n_bins="default", equal_prior=False, c
 
         if equal_prior is True :
             # for uniform binning in prior expected divergence
-            A_vec = udm_wrap.equal_prior( alpha_vec )
+            A_vec = dpm_wrap.equal_prior( alpha_vec )
             Zeta = np.trapz( mu_alpha, x=A_vec )
             DIV1 = mp.fdiv( np.trapz( np.multiply( mu_alpha, all_DIV_a ), x=A_vec ), Zeta ) 
 
@@ -163,7 +163,7 @@ def udm_estimator( udm_wrap, error=False, n_bins="default", equal_prior=False, c
         else :
             #  Compute Prior   #
             X, Y = np.meshgrid(alpha_vec, beta_vec)
-            all_phi = udm_wrap.udm_prior( [X, Y] ).reshape(len(alpha_vec), len(beta_vec))
+            all_phi = dpm_wrap.dpm_prior( [X, Y] ).reshape(len(alpha_vec), len(beta_vec))
             args = np.concatenate( [all_phi, np.multiply( all_phi, all_DIV_ab ) ] )
 
             if error is True :
@@ -178,8 +178,8 @@ def udm_estimator( udm_wrap, error=False, n_bins="default", equal_prior=False, c
         ####
     ####
 
-    estimate = np.array( udm_wrap.estim_mean(DIV1) ) 
+    estimate = np.array( dpm_wrap.estim_mean(DIV1) ) 
     if error is True :
-        estimate = np.append( estimate, [udm_wrap.estim_std(DIV1, DIV2)] )   
+        estimate = np.append( estimate, [dpm_wrap.estim_std(DIV1, DIV2)] )   
         
     return np.float64( estimate )

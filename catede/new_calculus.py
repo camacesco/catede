@@ -447,13 +447,15 @@ def myMinimizer( myfunc, var, args, jac=None ) :
 
 def optimal_dirichlet_param( compExp ) :
     '''.'''
+    # NOTE : this can be improved using the exact formula
     def myfunc( var, *args ) :
         LogLike = Polya(var, *args).log()
         return - LogLike
     def myjac(var, *args) :
         jac_LogLike = Polya(var, *args).log_jac()
         return - jac_LogLike 
-    return myMinimizer( myfunc, [INIT_GUESS], (compExp,), jac=myjac )
+    init_guess = INIT_GUESS
+    return myMinimizer( myfunc, [init_guess], (compExp,), jac=myjac )
 
 def optimal_entropy_param( compExp ) :
     '''.'''
@@ -465,7 +467,8 @@ def optimal_entropy_param( compExp ) :
         jac_LogLike = DirEntr(var, args[0].K).logMetapr_jac()
         jac_LogLike += Polya(var, *args).log_jac()
         return - jac_LogLike
-    return myMinimizer( myfunc, [INIT_GUESS], (compExp,), jac=myjac )
+    init_guess = optimal_dirichlet_param( compExp )
+    return myMinimizer( myfunc, [init_guess], (compExp,), jac=myjac )
 
 def optimal_crossentropy_param( compExp ) :
     '''(obsolete)''' 
@@ -489,7 +492,8 @@ def optimal_simpson_param( compExp ) :
         jac_LogLike = DirSimps(var, args[0].K).logMetapr_jac()
         jac_LogLike += Polya(var, *args).log_jac()
         return - jac_LogLike
-    return myMinimizer( myfunc, [INIT_GUESS], (compExp,), jac=myjac )
+    init_guess = optimal_dirichlet_param( compExp )
+    return myMinimizer( myfunc, [init_guess], (compExp,), jac=myjac )
 
 def optimal_equal_KLdiv_param( compDiv ) :
     '''.''' 
@@ -519,7 +523,9 @@ def optimal_KL_divergence_params( compDiv, choice="log-uniform", **kwargs ) :
         jac_LogLike[:,0] += Polya(var[0], args[0].compact_1).log_jac()
         jac_LogLike[:,1] += Polya(var[1], args[0].compact_2).log_jac()
         return - jac_LogLike
-    return myMinimizer( myfunc, [INIT_GUESS,INIT_GUESS], (compDiv, choice, kwargs), jac=myjac )
+    init_guess_a = optimal_dirichlet_param( compDiv.compact_1 )
+    init_guess_b = optimal_dirichlet_param( compDiv.compact_2 )
+    return myMinimizer( myfunc, [init_guess_a,init_guess_b], (compDiv, choice, kwargs), jac=myjac )
 
 def optimal_Hellinger_params( compDiv, choice="log-uniform", **kwargs ) :
     '''.'''
@@ -533,7 +539,9 @@ def optimal_Hellinger_params( compDiv, choice="log-uniform", **kwargs ) :
         jac_LogLike[:,0] += Polya(var[0], args[0].compact_1).log_jac()
         jac_LogLike[:,1] += Polya(var[1], args[0].compact_2).log_jac()
         return - jac_LogLike
-    return myMinimizer( myfunc, [INIT_GUESS,INIT_GUESS], (compDiv, choice, kwargs), jac=myjac )
+    init_guess_a = optimal_dirichlet_param( compDiv.compact_1 )
+    init_guess_b = optimal_dirichlet_param( compDiv.compact_2 )
+    return myMinimizer( myfunc, [init_guess_a,init_guess_b], (compDiv, choice, kwargs), jac=myjac )
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 #   POSTERIOR STANDARD DEVIATION  #

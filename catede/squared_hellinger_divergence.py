@@ -7,10 +7,10 @@
 '''
 
 import numpy as np
-from .udm_divergence import udm_estimator
+from .dpm_divergence import dpm_estimator
 from .new_calculus import *
 
-class udm_Hellinger() :
+class dpm_Hellinger() :
     ''' Auxiliary class to compute squared Hellinger divergence UDM estimator.'''
     def __init__( self, comp_div, choice="log-uniform", scaling=1 ) :
         self.comp_div = comp_div
@@ -26,7 +26,7 @@ class udm_Hellinger() :
     def log_equal_evidence_hess( self, a ) :
         return None
 
-    def udm_prior( self, var ) :
+    def dpm_prior( self, var ) :
         return DirHelldiv( var, self.comp_div.K, self.choice ).Metapr()
     
     def optimal_divergence_params( self ) :
@@ -58,9 +58,9 @@ def main(
     if equal_prior is True :
         raise SystemError( "The options `equal_prior` is not available yet."  )
 
-    udm_wrap = udm_Hellinger( comp_div, choice=choice, scaling=scaling )
+    dpm_wrap = dpm_Hellinger( comp_div, choice=choice, scaling=scaling )
 
-    output = udm_estimator( udm_wrap, 
+    output = dpm_estimator( dpm_wrap, 
                   error=error, n_bins=n_bins, 
                   equal_prior=equal_prior, cpu_count=cpu_count, verbose=verbose,
                   )
