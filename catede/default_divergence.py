@@ -8,12 +8,12 @@
 
 import warnings
 import numpy as np 
-from .kullback_leibler_divergence import main as _DKL_estimator
-from .squared_hellinger_divergence import main as _DH2_estimator
+from .dpm.kullback_leibler import main as _DKL_estimator
+from .dpm.squared_hellinger import main as _DH2_estimator
 from .default_entropy import _unit_Dict_
-from .new_calculus import optimal_dirichlet_param
+from .bayesian_calculus import optimal_polya_param
 from scipy.special import rel_entr
-from .beta_func_multivar import D_diGmm
+from .dirichlet_multinomial import D_diGmm
 
 _method_List_ = [
     "naive", "maximum-likelihood",
@@ -206,7 +206,7 @@ def Dirichlet( comp_div, a, b, which="Kullback-Leibler", **kwargs ):
     '''Estimation of divergence with Dirichlet-multinomial pseudocount model.'''
     # check options
     if a == "optimal" :
-        a = optimal_dirichlet_param(comp_div.compact_1)
+        a = optimal_polya_param(comp_div.compact_1)
     else :
         try:
             a = np.float64(a)
@@ -216,7 +216,7 @@ def Dirichlet( comp_div, a, b, which="Kullback-Leibler", **kwargs ):
             raise IOError('The concentration parameter `a` must greater than 0.')
 
     if b == "optimal" :
-        b = optimal_dirichlet_param(comp_div.compact_2)
+        b = optimal_polya_param(comp_div.compact_2)
     else :
         try:
             b = np.float64(b)
@@ -257,8 +257,8 @@ def Dirichlet( comp_div, a, b, which="Kullback-Leibler", **kwargs ):
 
 def max_evidence( comp_div, which="Kullback-Leibler", error=False, ):
     '''Estimation of divergence with Dirichlet-multinomial pseudocount model.'''
-    a_star = optimal_dirichlet_param(comp_div.compact_1)
-    b_star = optimal_dirichlet_param(comp_div.compact_2)
+    a_star = optimal_polya_param(comp_div.compact_1)
+    b_star = optimal_polya_param(comp_div.compact_2)
 
     if which == "Kullback-Leibler" :                               
         output = comp_div.kullback_leibler( a_star, b_star )

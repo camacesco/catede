@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) February 2023 Francesco Camaglia, LPENS 
+    Copyright (C) April 2023 Francesco Camaglia, LPENS 
 '''
 
 import warnings
 import numpy as np
 import pandas as pd
-from .beta_func_multivar import Experiment_Compact, Divergence_Compact
+from .dirichlet_multinomial import Experiment_Compact, Divergence_Compact
 from . import default_divergence, default_entropy
 
 class Skeleton_Class :
@@ -140,12 +140,6 @@ class Experiment( Skeleton_Class ) :
             self.counts_hist = self.counts_hist.sort_index(ascending=True) 
 
     def shannon( self, method="naive", unit="ln", **kwargs ):
-        # create an alias to use for clarity
-        __doc__ = self.entropy.__doc___
-
-        return self.entropy( method=method, unit=unit, **kwargs)
-
-    def entropy( self, method="naive", unit="ln", **kwargs ):
         '''Estimate Shannon entropy.
 
         Shannon entropy estimation through a chosen `method`.
@@ -178,7 +172,7 @@ class Experiment( Skeleton_Class ) :
     def simpson( self, method="naive", **kwargs ):
         '''Estimate Simpson index.
 
-        Simpson infrx estimation through a chosen `method`.
+        Simpson index estimation through a chosen `method`.
         The unit (of the logarithm) can be specified with the parameter `unit`.
 
         return numpy.array

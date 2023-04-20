@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) February 2023 Francesco Camaglia, LPENS 
+    Copyright (C) April 2023 Francesco Camaglia, LPENS 
 
     Following the architecture of J. Hausser and K. Strimmer : 
     https://strimmerlab.github.io/software/entropy/  
@@ -10,10 +10,10 @@
 
 import numpy as np
 from scipy.special import comb, entr
-from .new_calculus import optimal_dirichlet_param
-from .nsb_shannon_entropy import main as _Shannon_est
-from .nsb_simpson_index import main as _Simpson_est
-from .beta_func_multivar import D_diGmm
+from .bayesian_calculus import optimal_polya_param
+from .nsb.shannon import main as _Shannon_est
+from .nsb.simpson import main as _Simpson_est
+from .dirichlet_multinomial import D_diGmm
 import warnings 
 
 _method_List_ = [
@@ -278,7 +278,7 @@ def Dirichlet( compExp, a, which="Shannon", ):
     nn, ff = compExp.nn, compExp.ff
 
     if a == "optimal" :
-        a = optimal_dirichlet_param(compExp)
+        a = optimal_polya_param(compExp)
     else :
         try:
             a = np.float64(a)
@@ -310,7 +310,7 @@ def max_evidence( compExp, which="Shannon", error=False ):
     '''Expected entropy with Dirichlet-multinomial at maximum evidence.
 
     '''
-    a_star = optimal_dirichlet_param( compExp )
+    a_star = optimal_polya_param( compExp )
     if which == "Shannon" :
         output = compExp.entropy( a_star )
         if error == True :
