@@ -86,7 +86,7 @@ class DirHelldiv( two_dim_metapr ) :
     def marginaliz_phi(self, a, b) :
         '''.'''
         return np.exp(self.log_marginaliz_phi(a, b))
-    def log_marginaliz_phi( self, a, b ) :
+    def log_marginaliz_phi(self, a, b) :
         '''.'''
         dap = self.diverg_apriori(a, b)
         return 2 * np.log(1 - dap) - np.log(dap) - np.log(2 - dap)
@@ -99,7 +99,7 @@ class DirHelldiv( two_dim_metapr ) :
         output[:,0] = tmp * dap_jac[:,0]
         output[:,1] = tmp * dap_jac[:,1]    
         return output
-    def log_marginaliz_phi_hess( self, a, b ) : 
+    def log_marginaliz_phi_hess(self, a, b) : 
         '''.'''
         dap = self.diverg_apriori(a, b)
         dap_jac = self.diverg_apriori_jac(a, b)
@@ -147,11 +147,8 @@ class dpm_squared_Hellinger(dpm_wrapper) :
 #  EXECUTABLE  #
 ################
 
-def main(
-    cpct_div, error=False, n_bins="default", equal_prior=False,
-    choice="log-uniform", scaling=1.,
-    cpu_count=None, verbose=False, 
-    ) :
+def main( cpct_div, error=False, n_bins=None, equal_prior=False, n_sigma=3,
+         choice="log-uniform", scaling=1., cpu_count=None, verbose=False, logscaled=True) :
     '''squared Hellinger divergence estimation with UDM method.'''
 
     # FIXME : developer 
@@ -159,7 +156,7 @@ def main(
         raise SystemError( "The options `equal_prior` is not available yet."  )
 
     dpm_wrap = dpm_squared_Hellinger(cpct_div, choice=choice, scaling=scaling)
-    output = dpm_estimator(dpm_wrap, error=error, n_bins=n_bins,  
-                           cpu_count=cpu_count, verbose=verbose)
+    output = dpm_estimator(dpm_wrap, error=error, n_bins=n_bins, n_sigma=n_sigma,
+                           cpu_count=cpu_count, verbose=verbose, logscaled=logscaled)
     return output 
  

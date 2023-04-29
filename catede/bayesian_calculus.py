@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 '''
-    (in development)
-    Copyright (C) February 2023 Francesco Camaglia, LPENS 
+    Bayesian Calculus
+    -----------------
+    Copyright (C) April 2023 Francesco Camaglia, LPENS 
 '''
 
 import warnings
@@ -11,9 +12,8 @@ import numpy as np
 from scipy import optimize 
 from .dirichlet_multinomial import *
 
-N_SIGMA = 3
-MAX_ITER = 500
-TOL = 1.0e-14
+MAX_ITER = 1000
+TOL = 1.0e-16
 BOUND_DIR = (1.0e-5, 1.0e3)
 METHOD='L-BFGS-B'
 INIT_GUESS = 1.0
@@ -36,40 +36,37 @@ _PRIOR_CHOICE = {
 ########################################
 
 class BetaMultivariate_symmDir( ) :
-    def __init__( self, K ) : 
+    def __init__(self, K) : 
         '''Multivariate Beta function normalization to symmetric Dirichlet distribution.'''
         self.K = K
-    def log( self, a ) :
-        return self.K * LogGmm( a ) - LogGmm( self.K * a )
-    def log_jac( self, a ) :
-        return self.K * diGmm( a ) - self.K * diGmm( self.K * a )
-    def log_hess( self, a ) :
-        return self.K * triGmm( a ) - np.power(self.K, 2) * triGmm( self.K * a )
+    def log(self, a) :
+        return self.K * LogGmm(a) - LogGmm(self.K * a)
+    def log_jac(self, a) :
+        return self.K * diGmm(a) - self.K * diGmm(self.K * a)
+    def log_hess(self, a) :
+        return self.K * triGmm(a) - np.power(self.K, 2) * triGmm(self.K * a)
 
 class Polya( ) :
-    def __init__( self, cpct_exp ) : 
+    def __init__(self, cpct_exp) : 
         '''Polya distribution or symmetric-Dirichlet-multinomial distribution.'''
         self.ce = cpct_exp
-    def log( self, a ) :
+    def log(self, a) :
         '''logarithm'''
-        def sumGens( x ) : yield LogGmm( x )
-        output = self.ce._ffsum( sumGens( self.ce.nn + a ), dim=1 )
-        output -= LogGmm( self.ce.N + self.ce.K * a ) 
-        output -= BetaMultivariate_symmDir( self.ce.K ).log( a )                
+        output = self.ce.ff.dot(LogGmm(np.add.outer(self.ce.nn, a)))
+        output -= LogGmm(self.ce.N + self.ce.K * a) 
+        output -= BetaMultivariate_symmDir(self.ce.K).log(a)                
         return output
-    def log_jac( self, a ) :
+    def log_jac(self, a) :
         '''1st derivative of the logarithm'''
-        def sumGens( x ) : yield diGmm( x )
-        output = self.ce._ffsum( sumGens( self.ce.nn + a ), dim=1 ) 
-        output -= self.ce.K * diGmm( self.ce.N + self.ce.K * a ) 
-        output -= BetaMultivariate_symmDir( self.ce.K ).log_jac( a )                   
+        output = self.ce.ff.dot(diGmm(np.add.outer(self.ce.nn, a))) 
+        output -= self.ce.K * diGmm(self.ce.N + self.ce.K * a) 
+        output -= BetaMultivariate_symmDir(self.ce.K).log_jac(a)                   
         return output
-    def log_hess( self, a ) :
+    def log_hess(self, a) :
         '''2nd derivative of the logarithm'''
-        def sumGens( x ) : yield triGmm( x )
-        output = self.ce._ffsum( sumGens( self.ce.nn + a ), dim=1 ) 
-        output -= np.power(self.ce.K, 2) * triGmm( self.ce.N + self.ce.K * a ) 
-        output -= BetaMultivariate_symmDir( self.ce.K ).log_hess( a )     
+        output = self.ce.ff.dot(triGmm(np.add.outer(self.ce.nn, a))) 
+        output -= np.power(self.ce.K, 2) * triGmm(self.ce.N + self.ce.K * a) 
+        output -= BetaMultivariate_symmDir(self.ce.K).log_hess(a)     
         return output
 
 #############################
@@ -81,27 +78,27 @@ class one_dim_metapr( ) :
     def metapr( self, a ) :
         '''factor of transformation Jacobian determinant (i.e abs of 1st derivative, NSB metaprior) '''
         a = np.array(a).reshape(-1)
-        return self._sign * self.drv_1( a )
-    def metapr_jac( self, a ) :
+        return self._sign * self.drv_1(a)
+    def metapr_jac(self, a) :
         '''1st derivative of the transformation factor.'''
         a = np.array(a).reshape(-1)
-        return self._sign * self.drv_2( a )
-    def metapr_hess( self, a ) :
+        return self._sign * self.drv_2(a)
+    def metapr_hess(self, a) :
         '''2nd derivative of the transformation factor.'''
         a = np.array(a).reshape(-1)
-        return self._sign * self.drv_3( a )
-    def logmetapr( self, a ) :
+        return self._sign * self.drv_3(a)
+    def logmetapr(self, a) :
         '''logarithm of the transformation factor.'''
         a = np.array(a).reshape(-1)
-        return np.log( self.metapr( a ) )
-    def logmetapr_jac( self, a ) :
+        return np.log(self.metapr(a))
+    def logmetapr_jac(self, a) :
         '''1st derivative of the logarithm of the transformation factor.'''
         a = np.array(a).reshape(-1)
-        return self.metapr_jac( a ) / self.metapr( a )
-    def logmetapr_hess( self, a ) :
+        return self.metapr_jac(a) / self.metapr(a)
+    def logmetapr_hess(self, a) :
         '''2nd derivative of the logarithm of the transformation factor.'''
         a = np.array(a).reshape(-1)
-        return self.metapr_hess( a ) / self.metapr( a ) - np.power(self.logmetapr_jac( a ), 2)
+        return self.metapr_hess(a) / self.metapr(a) - np.power(self.logmetapr_jac(a), 2)
 
 ###########################
 #  2-DIM METAPRIOR TERMS  #
@@ -109,7 +106,7 @@ class one_dim_metapr( ) :
 
 class two_dim_metapr( ) :
     ''' Auxiliary class for two dimensional metapriors.'''
-    def __init__(self, K, choice, **kwargs ) :
+    def __init__(self, K, choice, **kwargs) :
         # note : get around 0-dimensional numpy scalar arrays
         self.K = K
         self.choice = choice
@@ -132,7 +129,7 @@ class two_dim_metapr( ) :
                     raise TypeError( "The parameter `scaling` should be a scalar." )
         self.use_phi = _PRIOR_CHOICE[self.choice]["use_phi"]
 
-    def metapr( self, var ) :
+    def metapr(self, var) :
         ''' Complete metaprior '''
         # pre-load variables
         a = np.array(var[0]).reshape(-1)
@@ -143,16 +140,16 @@ class two_dim_metapr( ) :
         if self.use_phi is True :
             output = self.marginaliz_phi(a, b)
         else :
-            output = np.ones( shape = (np.size(dap),) )
+            output = np.ones(shape = (np.size(dap),))
         
         # contribution of the prior on the a priori expected divergence rho(D)
         if self.choice in ["scaled"] :
-            output *= np.exp( - self._extra["scaling"] * (dap / self.A.apriori(a)) )
+            output *= np.exp(- self._extra["scaling"] * (dap / self.A.apriori(a)))
         elif self.choice in ["uniform"] :
-            output[ dap >= CUTOFFRATIO * np.log(self.K) ] = NUMERICAL_ZERO
+            output[dap >= CUTOFFRATIO * np.log(self.K)] = NUMERICAL_ZERO
             # NOTE : no point in adding the normalization 1. / (CUTOFFRATIO * np.log(self.K))
         elif self.choice in ["log-uniform"] :
-            output *= np.power( dap, - self._extra["scaling"] )    
+            output *= np.power(dap, - self._extra["scaling"])    
 
         # contribution of the jacobian of the transformation
         output *= self.A.metapr(a) * self.B.metapr(b) 
@@ -163,22 +160,22 @@ class two_dim_metapr( ) :
         # pre-load variables
         a = np.array(var[0]).reshape(-1)
         b = np.array(var[1]).reshape(-1)
-        dap = self.diverg_apriori(a,b)
+        dap = self.diverg_apriori(a, b)
 
         # contribution of the marginalization constraint phi
         if self.use_phi is True :
             output = self.log_marginaliz_phi(a, b)
         else :
-            output = np.zeros( shape = (np.size(dap),) )
+            output = np.zeros(shape = (np.size(dap),))
 
         # contribution of the prior on the divergence log rho(D)
         if self.choice in ["scaled"] :
             output -= self._extra["scaling"] * (dap / self.A.apriori(a))
         elif self.choice in ["uniform"] :
-            output[ dap >= CUTOFFRATIO * np.log(self.K) ] = - NUMERICAL_INFTY 
+            output[dap >= CUTOFFRATIO * np.log(self.K)] = - NUMERICAL_INFTY 
 
         elif self.choice in ["log-uniform"] :
-                output -= self._extra["scaling"] * np.log( dap ) 
+                output -= self._extra["scaling"] * np.log(dap) 
 
         # contribution of the jacobian of the transformation
         output += self.A.logmetapr(a) + self.B.logmetapr(b)
@@ -189,30 +186,30 @@ class two_dim_metapr( ) :
         # pre-load variables
         a = np.array(var[0]).reshape(-1)
         b = np.array(var[1]).reshape(-1)
-        dap = self.diverg_apriori(a,b)
-        dap_jac = self.diverg_apriori_jac(a,b)
+        dap = self.diverg_apriori(a, b)
+        dap_jac = self.diverg_apriori_jac(a, b)
 
         # contribution of the marginalization constraint phi
         if self.use_phi is True :
             output = self.log_marginaliz_phi_jac(a, b)
         else :
-            output = np.zeros( shape = (np.size(dap), 2,) )
+            output = np.zeros(shape = (np.size(dap), 2,))
 
         # contribution of the prior on the divergence rho
         if self.choice in ["scaled"] :
-            output[:,0] -= self._extra["scaling"] * (dap_jac[:,0] - dap * self.A.drv_1(a) / self.A.apriori(a) )  / self.A.apriori(a)
-            output[:,1] -= self._extra["scaling"] * dap_jac[:,1] / self.A.apriori(a)
+            output[:, 0] -= self._extra["scaling"] * (dap_jac[:,0] - dap * self.A.drv_1(a) / self.A.apriori(a))  / self.A.apriori(a)
+            output[:, 1] -= self._extra["scaling"] * dap_jac[:,1] / self.A.apriori(a)
         elif self.choice in ["uniform"] :
             mask = dap < np.log(self.K)
             output[ ~mask,: ] = NUMERICAL_ZERO
             output[ dap >= CUTOFFRATIO * np.log(self.K),: ] = - NUMERICAL_INFTY
         elif self.choice in ["log-uniform"] :
-            output[:,0] -= self._extra["scaling"] * dap_jac[:,0] / dap
-            output[:,1] -= self._extra["scaling"] * dap_jac[:,1] / dap
+            output[:, 0] -= self._extra["scaling"] * dap_jac[:,0] / dap
+            output[:, 1] -= self._extra["scaling"] * dap_jac[:,1] / dap
 
         # contribution of the jacobian of the transformation
-        output[:,0] += self.A.logmetapr_jac(a)
-        output[:,1] += self.B.logmetapr_jac(b)
+        output[:, 0] += self.A.logmetapr_jac(a)
+        output[:, 1] += self.B.logmetapr_jac(b)
         return output
     
     def logmetapr_hess( self, var ) :
@@ -220,9 +217,9 @@ class two_dim_metapr( ) :
         # pre-load variables
         a = np.array(var[0]).reshape(-1)
         b = np.array(var[1]).reshape(-1)
-        dap = self.diverg_apriori(a,b)
-        dap_jac = self.diverg_apriori_jac(a,b)
-        dap_hess = self.diverg_apriori_hess(a,b)
+        dap = self.diverg_apriori(a, b)
+        dap_jac = self.diverg_apriori_jac(a, b)
+        dap_hess = self.diverg_apriori_hess(a, b)
 
         # contribution of the marginalization constraint phi
         if self.use_phi is True :
@@ -262,10 +259,10 @@ class two_dim_metapr( ) :
 #  MAXIMUM A POSTERIORI  #
 # >>>>>>>>>>>>>>>>>>>>>>>>
 
-def minimize( myfunc, var, args=(), bounds=None, jac=None ) :
+def minimize(myfunc, var, args=(), bounds=None, jac=None) :
     '''General minimization wrapper for `myfunc`.'''
     
-    if USE_JAC_OPT is False : jac = None
+    if USE_JAC_OPT == False : jac = None
     results = optimize.minimize(
         myfunc,
         x0=var, args=args,
@@ -282,11 +279,11 @@ def minimize( myfunc, var, args=(), bounds=None, jac=None ) :
 def optimal_polya_param( cpct_exp ) :
     '''.'''
     # NOTE : this can be improved using the exact formula
-    def myfunc( var, *args ) :
+    def myfunc(var, *args) :
         return - Polya(*args).log(var)
     def myjac(var, *args) :
         return - Polya(*args).log_jac(var)
-    return minimize( myfunc, [INIT_GUESS], args=(cpct_exp,), bounds=(BOUND_DIR,), jac=myjac )
+    return minimize(myfunc, [INIT_GUESS], args=(cpct_exp,), bounds=(BOUND_DIR,), jac=myjac)
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>
 #  ONE dim meta likelihood  #
@@ -294,7 +291,7 @@ def optimal_polya_param( cpct_exp ) :
 
 class one_dim_meta_likelihood( ) :
     '''This class deals with the 1D meta-likelihood (or likelihood of the hyperparameter)'''
-    def __init__( self, cpct_exp, dir_meta_obj, ) :
+    def __init__(self, cpct_exp, dir_meta_obj) :
         '''
         Parameters 
         ----------
@@ -304,36 +301,40 @@ class one_dim_meta_likelihood( ) :
         self.dir_meta_obj = dir_meta_obj
         self.polya = Polya( cpct_exp )
 
-    def neglog( self, a ) :
+    def neglog(self, a) :
         '''Negative of the log-meta-likelihood.'''
         LogLike = self.dir_meta_obj.logmetapr(a)
         LogLike += self.polya.log(a)
         return - LogLike
-    def neglog_jac( self, a ) :
+    def neglog_jac(self, a) :
         '''Negative of the gradient of the log-meta-likelihood.'''
         jac_LogLike = self.dir_meta_obj.logmetapr_jac(a)
         jac_LogLike += self.polya.log_jac(a)
         return - jac_LogLike
-    def neglog_hess( self, a ) :
+    def neglog_hess(self, a) :
         '''Negative of the Hessian of the log-meta-likelihood.'''
         hess_LogLike = self.dir_meta_obj.logmetapr_hess(a)
         hess_LogLike += self.polya.log_hess(a)
         return - hess_LogLike
-    def maximize( self, init_var ) :
+    def maximize(self, init_var) :
         '''.'''
         return minimize( self.neglog, init_var, jac=self.neglog_jac, bounds=(BOUND_DIR,) )
 
     '''
     Negative log-meta-likelihood for maximization in logscale.
     '''
-    def lgscl_neglog( self, lgscl_var ) :
-        return self.neglog( np.exp(lgscl_var)) - lgscl_var
-    def lgscl_neglog_jac( self, lgscl_var ) :
+    def lgscl_neglog(self, lgscl_var) :
+        return self.neglog(np.exp(lgscl_var)) - lgscl_var
+    def lgscl_neglog_jac(self, lgscl_var) :
         return np.exp(lgscl_var) * self.neglog_jac(np.exp(lgscl_var)) - 1
-    def lgscl_neglog_hess( self, lgscl_var ) :
-        return self.lgscl_neglog_jac( lgscl_var ) + 1 + np.exp(2*lgscl_var) * self.neglog_hess(np.exp(lgscl_var))
-    def lgscl_maximize( self, init_var ) :
-        return minimize( self.lgscl_neglog, init_var, jac=self.lgscl_neglog_jac, bounds=None )
+    def lgscl_neglog_hess(self, lgscl_var) :
+        return self.lgscl_neglog_jac(lgscl_var) + 1 + np.exp(2*lgscl_var) * self.neglog_hess(np.exp(lgscl_var))
+    def lgscl_maximize(self, init_var) :
+        return minimize(self.lgscl_neglog, init_var, jac=self.lgscl_neglog_jac, bounds=None )
+    '''
+    Negative log-meta-likelihood for maximization in logscale.
+    '''
+
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>
 #  TWO dim meta likelihood  #
@@ -358,18 +359,24 @@ class two_dim_meta_likelihood( ) :
 
     def neglog( self, var ) :
         '''Negative of the log-meta-likelihood.'''
-        LogLike = self.dir_meta_obj.logmetapr( var )   
-        LogLike += self.polya_1.log( var[0] )
-        LogLike += self.polya_2.log( var[1] )
-        return - LogLike
+        a = np.array(var[0]).reshape(-1)
+        b = np.array(var[1]).reshape(-1)
+        log_like = np.add.outer(self.polya_1.log(a), self.polya_2.log(b))
+        X, Y = np.meshgrid(a, b)
+        log_like += self.dir_meta_obj.logmetapr([X, Y]).reshape(len(a), len(b))
+        return - log_like
     def neglog_jac( self, var ) :
         '''Negative of the gradient of the log-meta-likelihood.'''
+        # FIXME :
+        # this computation should be vectorialized
         jac_LogLike = self.dir_meta_obj.logmetapr_jac( var )
         jac_LogLike[:,0] += self.polya_1.log_jac( var[0] )
         jac_LogLike[:,1] += self.polya_2.log_jac( var[1] )
         return - jac_LogLike
     def neglog_hess( self, var ) :
         '''Negative of the Hessian of the log-meta-likelihood.'''
+        # FIXME :
+        # this computation should be vectorialized
         hess_LogLike = self.dir_meta_obj.logmetapr_hess( var )
         hess_LogLike[:,0,0] += self.polya_1.log_hess( var[0] )
         hess_LogLike[:,1,1] += self.polya_2.log_hess( var[1] )
@@ -381,42 +388,64 @@ class two_dim_meta_likelihood( ) :
     '''
     Negative log-meta-likelihood for maximization in logscale.
     '''
-    def lgscl_neglog( self, lgscl_var ) :
-        return self.neglog(np.exp(lgscl_var)) - np.sum(lgscl_var)
-    def lgscl_neglog_jac( self, lgscl_var ) :
-        output = self.neglog_jac(np.exp(lgscl_var))
-        output[:,0] *= np.exp(lgscl_var[0])
-        output[:,1] *= np.exp(lgscl_var[1])
-        output -= 1
+    def lgscl_neglog(self, var) :
+        a = np.array(var[0]).reshape(-1)
+        b = np.array(var[1]).reshape(-1)
+        add_on = np.log(np.add.outer(a, b))
+        return self.neglog(var) - add_on
+    def lgscl_neglog_jac(self, var) :
+        # FIXME :
+        # this computation should be vectorialized
+        output = self.neglog_jac(var)
+        output[:,0] *= var[0]
+        output[:,1] *= var[1]
+        output -= 1.
         return output
-    def lgscl_neglog_hess( self, lgscl_var ) :
-        output = self.neglog_hess(np.exp(lgscl_var))
-        jac = self.lgscl_neglog_jac(np.exp(lgscl_var))
-        output[:,0,0] *= np.exp(2*lgscl_var[0])
-        output[:,0,1] *= np.exp(lgscl_var).prod()
-        output[:,1,0] *= np.exp(lgscl_var).prod()
-        output[:,1,1] *= np.exp(2*lgscl_var[1])
-        output[:,0,0] += jac[:,0] + 1
-        output[:,1,1] += jac[:,1] + 1
+    def lgscl_neglog_hess( self, var ) :
+        # FIXME :
+        # this computation should be vectorialized
+        output = self.neglog_hess(var)
+        jac = self.lgscl_neglog_jac(var)
+        output[:,0,0] *= np.power(var[0], 2)
+        output[:,0,1] *= np.prod(var)
+        output[:,1,0] *= np.prod(var).prod()
+        output[:,1,1] *= np.power(var[1], 2)
+        output[:,0,0] += jac[:,0] + 1.
+        output[:,1,1] += jac[:,1] + 1.
         return output
     def lgscl_maximize( self, init_var ) :
-        return minimize( self.lgscl_neglog, init_var, jac=self.lgscl_neglog_jac, bounds=(np.log(BOUND_DIR),)*2 )
+        return minimize( self.lgscl_neglog, init_var, jac=self.lgscl_neglog_jac, bounds=((BOUND_DIR),)*2 )
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 #   POSTERIOR STANDARD DEVIATION  #
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-def empirical_n_bins( size, categories ) :
+def empirical_n_bins( size, categories, ceil_value=200 ) :
     '''Empirical choice for the number of bins (obsolete).'''
     n_bins = max(1, 10 * np.power(categories / size, 2)) 
-    n_bins = min(int(n_bins), 200) 
+    n_bins = min(int(n_bins), ceil_value) 
     return n_bins
 
-def centered_logspaced_binning( loc, std, n_bins ) :
-    '''(obsolete).'''
+# FIXME !!!
+def lgscl_binning(loc, lgscl_std, n_bins, bounds=BOUND_DIR, n_sigma=3) :
+    '''.'''
+    assert (loc > bounds[0]) and (loc < bounds[1])
+    assert n_bins%2 == 1
+    lgscl_loc = np.log(loc)
+    lgscl_bound = np.log(bounds)
     output = np.append(
-        np.logspace( np.log10(max(BOUND_DIR[0], loc-N_SIGMA*std)), np.log10(loc), n_bins//2 )[:-1],
-        np.logspace( np.log10(loc), np.log10(min(BOUND_DIR[1], loc+N_SIGMA*std)), n_bins//2+1 )
+        np.linspace( max(lgscl_bound[0], lgscl_loc-n_sigma*lgscl_std), lgscl_loc, n_bins//2+1 )[:-1],
+        np.linspace( lgscl_loc, min(lgscl_bound[1], lgscl_loc+n_sigma*lgscl_std), n_bins//2+1 )
+        )
+    return np.exp(output)
+
+def centered_logspaced_binning(loc, std, n_bins, bounds=BOUND_DIR, n_sigma=3) :
+    '''.'''
+    assert (loc > bounds[0]) and (loc < bounds[1])
+    assert n_bins%2 == 1
+    output = np.append(
+        np.logspace( np.log10(max(bounds[0], loc-n_sigma*std)), np.log10(loc), n_bins//2+1 )[:-1],
+        np.logspace( np.log10(loc), np.log10(min(bounds[1], loc+n_sigma*std)), n_bins//2+1 )
         )
     return output
 

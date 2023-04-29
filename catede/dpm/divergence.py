@@ -3,7 +3,7 @@
 
 '''
 Unbiased Dirichlet Mixture Method - Divergence Estimator
-Copyright (C) February 2023 Francesco Camaglia, LPENS 
+Copyright (C) April 2023 Francesco Camaglia, LPENS 
 '''
 
 import itertools
@@ -11,7 +11,7 @@ import warnings
 import numpy as np
 from mpmath import mp
 import multiprocessing
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from ..bayesian_calculus import *
 
 class dpm_wrapper( ) :
@@ -21,15 +21,15 @@ class dpm_wrapper( ) :
     def logmetapr( self, var ) :
         return self.dir_meta_obj.logmetapr(var)
     def optimal_divergence_params(self) :
-        guess_a = optimal_polya_param(self.cpct_div.compact_1)
-        guess_b = optimal_polya_param(self.cpct_div.compact_2)
-        return self.meta_likelihood.maximize([guess_a, guess_b])
+        return self.meta_likelihood.maximize([INIT_GUESS, INIT_GUESS])
+    def neglog_evidence(self, var) :
+        return self.meta_likelihood.neglog( var )
     def neglog_evidence_hess(self, var) :
         return self.meta_likelihood.neglog_hess( var )
     def lgscl_optimal_divergence_params(self) :
-        guess_a = np.log(optimal_polya_param(self.cpct_div.compact_1))
-        guess_b = np.log(optimal_polya_param(self.cpct_div.compact_2))
-        return self.meta_likelihood.lgscl_maximize([guess_a, guess_b])
+        return self.meta_likelihood.lgscl_maximize([INIT_GUESS, INIT_GUESS])
+    def lgscl_neglog_evidence(self, var) :
+        return self.meta_likelihood.lgscl_neglog(var)
     def lgscl_neglog_evidence_hess(self, var) :
         return self.meta_likelihood.lgscl_neglog_hess(var)
     
@@ -37,7 +37,8 @@ class dpm_wrapper( ) :
 #  DPM ESTIMATOR  #
 ###################
 
-def dpm_estimator( dpm_wrap, error=False, n_bins="default", cpu_count=None, verbose=False, ) :
+def dpm_estimator(dpm_wrap, error=False, n_sigma=3, n_bins=None, cpu_count=None, 
+                  verbose=False, logscaled=True) :
     '''Divergence estimator with DPM method.'''
 
     # >>>>>>>>>>>>>>>>>>>>>>
@@ -52,14 +53,14 @@ def dpm_estimator( dpm_wrap, error=False, n_bins="default", cpu_count=None, verb
     #
     # number of bins
     #
-    if n_bins == "default" :
-        n_bins = empirical_n_bins( min(dpm_wrap.cpct_div.N_1, dpm_wrap.cpct_div.N_2), dpm_wrap.cpct_div.K )
-        if verbose is True :
+    if n_bins == None :
+        n_bins = empirical_n_bins(min(dpm_wrap.cpct_div.N_1, dpm_wrap.cpct_div.N_2), dpm_wrap.cpct_div.K)
+        if verbose == True :
            warnings.warn("The precision is chosen by default.")
     try :
         n_bins = int(n_bins)
     except :
-        raise TypeError("The parameter `n_bins` requires an integer value or `default`.")
+        raise TypeError("The parameter `n_bins` requires an integer value.")
     if n_bins > 1 :
         n_bins += (n_bins%2)==0 # only odd numbers of bins
     saddle_point_method = (n_bins < 2) # only saddle
@@ -81,9 +82,13 @@ def dpm_estimator( dpm_wrap, error=False, n_bins="default", cpu_count=None, verb
     # <<<<<<<<<<<<<<<<<<<<
 
     #  Find Point of maximum evidence #
-    a_star, b_star = dpm_wrap.optimal_divergence_params()
-   
-    neglog_evidence_hess = dpm_wrap.neglog_evidence_hess([a_star, b_star])
+    if logscaled == True :
+        a_star, b_star = dpm_wrap.lgscl_optimal_divergence_params()
+        neglog_evidence_hess = dpm_wrap.lgscl_neglog_evidence_hess([a_star, b_star])
+    else :
+        a_star, b_star = dpm_wrap.optimal_divergence_params()
+        neglog_evidence_hess = dpm_wrap.neglog_evidence_hess([a_star, b_star])
+
     std_a = np.power(neglog_evidence_hess[:,0,0], -0.5)
     std_b = np.power(neglog_evidence_hess[:,1,1], -0.5)
 
@@ -96,7 +101,6 @@ def dpm_estimator( dpm_wrap, error=False, n_bins="default", cpu_count=None, verb
         # 
         #  SADDLE POINT  #
         # 
-
         DIV1= dpm_wrap.divergence(a_star, b_star)
         if error is True :
             DIV2 = dpm_wrap.squared_divergence(a_star, b_star)
@@ -106,34 +110,34 @@ def dpm_estimator( dpm_wrap, error=False, n_bins="default", cpu_count=None, verb
         #  FULL INTEGRATION  #
         # 
 
-        alpha_vec = centered_logspaced_binning(a_star, std_a, n_bins_a)
-        beta_vec = centered_logspaced_binning(b_star, std_b, n_bins_b)
+        if logscaled == True :
+            alpha_vec = lgscl_binning(a_star, std_a, n_bins_a, n_sigma=n_sigma)
+            beta_vec = lgscl_binning(b_star, std_b, n_bins_b, n_sigma=n_sigma)
+        else :
+            alpha_vec = centered_logspaced_binning(a_star, std_a, n_bins_a, n_sigma=n_sigma)
+            beta_vec = centered_logspaced_binning(b_star, std_b, n_bins_b, n_sigma=n_sigma)
 
-        # compute polya
-        polya_a = Polya(dpm_wrap.cpct_div.compact_1)
-        log_mu_alpha = list(map(lambda a : polya_a.log(a), alpha_vec ))   
-        polya_b = Polya(dpm_wrap.cpct_div.compact_2)
-        log_mu_beta = list(map(lambda b : polya_b.log(b), beta_vec )) 
-
-        log_mu = np.add.outer(log_mu_alpha, log_mu_beta)
-        #  compute metaprior   #
-        X, Y = np.meshgrid(alpha_vec, beta_vec)
-        log_mu += dpm_wrap.logmetapr([X, Y]).reshape(len(alpha_vec), len(beta_vec))
-
-        log_mu -= np.max( log_mu ) # regularization
-        mu = np.exp( log_mu )
+        # compute measure
+        if logscaled == True :
+            log_measure = dpm_wrap.lgscl_neglog_evidence([alpha_vec, beta_vec])
+        else :
+            log_measure = dpm_wrap.neglog_evidence([alpha_vec, beta_vec])
+        log_measure -= np.min(log_measure) # regularization
+        measure = np.exp(-log_measure)
 
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         #  DKL estimator vs alpha,beta  #
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-        # FIXME : parallelization is weak...
-        POOL = multiprocessing.Pool( cpu_count ) 
+        # FIXME : 
+        # parallelization is weak...
 
-        args = [x for x in itertools.product( alpha_vec, beta_vec )]
+        POOL = multiprocessing.Pool(cpu_count) 
+
+        args = [x for x in itertools.product(alpha_vec, beta_vec)]
         tqdm_args = tqdm(args, total=len(args), desc='Evaluations...', disable=disable)
-        all_DIV_ab = POOL.starmap( dpm_wrap.divergence, tqdm_args )
-        all_DIV_ab = np.asarray(all_DIV_ab).reshape(len(alpha_vec), len(beta_vec))
+        all_DIV_ab = POOL.starmap(dpm_wrap.divergence, tqdm_args)
+        all_DIV_ab = np.asarray(all_DIV_ab).reshape(n_bins_a, n_bins_b)
     
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         #  DIV2 estimator vs alpha,beta  #
@@ -142,7 +146,7 @@ def dpm_estimator( dpm_wrap, error=False, n_bins="default", cpu_count=None, verb
         if error == True :
             tqdm_args = tqdm(args, total=len(args), desc='Squared...', disable=disable)
             all_DIV2_ab = POOL.starmap(dpm_wrap.squared_divergence, tqdm_args)
-            all_DIV2_ab = np.asarray(all_DIV2_ab).reshape(len(alpha_vec), len(beta_vec))
+            all_DIV2_ab = np.asarray(all_DIV2_ab).reshape(n_bins_a, n_bins_b)
 
         POOL.close()
     
@@ -150,15 +154,22 @@ def dpm_estimator( dpm_wrap, error=False, n_bins="default", cpu_count=None, verb
         #   integrations  #
         # >>>>>>>>>>>>>>>>>
 
-        args = np.concatenate([mu, np.multiply(mu, all_DIV_ab)])
+        if logscaled == True :
+            x = np.log(alpha_vec)
+            y = np.log(beta_vec)
+        else :
+            x = alpha_vec
+            y = beta_vec
+
+        args = np.concatenate([measure, np.multiply(measure, all_DIV_ab)])
         if error is True :
-            args = np.concatenate([args, np.multiply(mu, all_DIV2_ab)])
-        integr_a = np.asarray(list(map(lambda i : np.trapz(i, x=beta_vec), args)))
-        Zeta = np.trapz(integr_a[:len(alpha_vec)], x=alpha_vec)
-        DIV1 = np.trapz(integr_a[len(alpha_vec):2*len(alpha_vec)], x=alpha_vec) 
-        DIV1 = mp.fdiv( DIV1, Zeta )  
+            args = np.concatenate([args, np.multiply(measure, all_DIV2_ab)])
+        integr_a = np.trapz(args, x=y, axis=1)
+        Zeta = np.trapz(integr_a[:n_bins_a], x=x)
+        DIV1 = np.trapz(integr_a[n_bins_a:2*n_bins_a], x=x) 
+        DIV1 = mp.fdiv(DIV1, Zeta)  
         if error is True :  
-            DIV2 = mp.fdiv(np.trapz(integr_a[2*len(alpha_vec):], x=alpha_vec ), Zeta) 
+            DIV2 = mp.fdiv(np.trapz(integr_a[2*n_bins_a:], x=x ), Zeta) 
         ####
     ####
 

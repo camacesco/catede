@@ -11,23 +11,23 @@
 import numpy as np
 from scipy.special import comb, entr
 from .bayesian_calculus import optimal_polya_param
-from .nsb.shannon import main as _Shannon_est
-from .nsb.simpson import main as _Simpson_est
+from .nsb.shannon import main as _shannon_nsb_est
+from .nsb.simpson import main as _simpson_nsb_est
 from .dirichlet_multinomial import D_diGmm
 import warnings 
 
 _method_List_ = [
     "naive",
+    "cat", "categorical",
+    "max_evidence",
     "NSB", "Nemenmann-Shafee-Bialek",
     "CS", "Chao-Shen", 
-    "Di", "Dirichlet", 
     "Je", "Jeffreys",
     "MM", "Miller-Madow", 
     "La", "Laplace", 
     "Tr", "minimax", "Trybula", 
     "Pe", "Perks",
     "SG", "Schurmann-Grassberger", 
-    "max_evidence",
 ]
 
 _which_List_ = ["Shannon", "Simpson"]
@@ -43,11 +43,11 @@ _unit_Dict_ = {
 #  ALIASES  #
 #############
 
-def Shannon_oper( x, y=None ) :
+def shannon_operator( x, y=None ) :
     ''' - x * log( x ) '''
     return entr(x)
 
-def Simpson_oper( x ) :
+def simpson_operator( x ) :
     ''' x^2 '''
     return np.power(x,2)
 
@@ -56,7 +56,7 @@ def Simpson_oper( x ) :
 #################
 
 def switchboard( compExp, method="naive", which="Shannon", unit="default", **kwargs ):
-    ''''''
+    '''.'''
 
     # check which 
     if which not in _which_List_ :
@@ -72,54 +72,59 @@ def switchboard( compExp, method="naive", which="Shannon", unit="default", **kwa
 
     # choosing entropy estimation method
     if method in ["naive"] :    
-        estimate = Naive( compExp, which=which, **kwargs )
+        estimate = naive(compExp, which=which)
         
     elif method in ["NSB", "Nemenman-Shafee-Bialek"]:   
         if which == "Shannon" :
-            estimate = _Shannon_est( compExp, **kwargs )
+            estimate = _shannon_nsb_est(compExp, **kwargs)
         elif which == "Simpson" :
-            estimate = _Simpson_est( compExp, **kwargs )
+            estimate = _simpson_nsb_est(compExp, **kwargs )
         else :
             raise IOError("FIXME: place holder.")
         
     elif method in ["MM", "Miller-Madow"]:  
-        estimate = MillerMadow( compExp, which=which, **kwargs )
+        estimate = miller_madow(compExp, which=which)
         
     elif method in ["CS", "Chao-Shen"] :        
-        estimate = ChaoShen( compExp, which=which, **kwargs )
+        estimate = chao_shen(compExp, which=which)
 
     elif method in ["SG", "Schurmann-Grassberger"] :
-        estimate = Schurmann_Grassberger( compExp )
- 
-    elif method in ["Di", "Dirichlet"] :
-        if "a" not in kwargs :
-            a = "optimal"
-            #warnings.warn("Dirichlet parameter `a` set to optimal.")
-        else :
-            a = kwargs['a']
-        estimate = Dirichlet( compExp, a, which=which, **kwargs ) 
+        estimate = schurmann_grassberger(compExp, which=which)
 
     elif method in ["max_evidence"] :
-        estimate = max_evidence( compExp, which=which, **kwargs )   
+        estimate = dirichlet_multinomial_expected_value(compExp, which=which, **kwargs)   
+
+    elif method in ["categorical"] :
+        estimate = dirichlet_multinomial_expected_value(compExp, param=1, which=which, **kwargs)   
 
     elif method in ["La", "Laplace"] :
         a = 1.
-        estimate = Dirichlet( compExp, a, which=which, **kwargs )
+        estimate = dirichlet_multinomial_pseudo_count(compExp, a, which=which)
 
     elif method in ["Je", "Jeffreys"] :
         a = 0.5
-        estimate = Dirichlet( compExp, a, which=which, **kwargs )
+        estimate = dirichlet_multinomial_pseudo_count(compExp, a, which=which)
 
     elif method in ["Pe", "Perks"]:
         a = 1. / compExp.Kobs
-        estimate = Dirichlet( compExp, a, which=which, **kwargs )
+        estimate = dirichlet_multinomial_pseudo_count(compExp, a, which=which)
         
     elif method in ["Tr", "Trybula", "minimax"]:
         a = np.sqrt( compExp.N ) / compExp.K
-        estimate = Dirichlet( compExp, a, which=which, **kwargs )
+        estimate = dirichlet_multinomial_pseudo_count(compExp, a, which=which)
 
     else:
-        raise IOError("Unkown method. Please choose `method` amongst :", _method_List_ )
+        raise IOError("Unkown method. Please choose `method` amongst :", _method_List_)
+    
+    '''
+    elif method in ["Di", "Dirichlet"] :
+        if "a" not in kwargs :
+            a = None
+            #warnings.warn("Dirichlet parameter `a` set to optimal.")
+        else :
+            a = kwargs['a']
+        estimate = dirichlet_multinomial_pseudo_count( compExp, a=None, which=which, **kwargs ) 
+    '''
 
     return unit_conv * estimate
 ###
@@ -128,21 +133,22 @@ def switchboard( compExp, method="naive", which="Shannon", unit="default", **kwa
 #  NAIVE ESTIMATOR  #
 #####################
 
-def Naive( compExp, which="Shannon", ):
+def naive( compExp, which="Shannon" ):
     '''Entropy estimation (naive).'''
 
     # loading parameters from compExp 
-    N, nn, ff = compExp.N, compExp.nn, compExp.ff
-    # delete 0 counts (if present they are at position 0)
-    if 0 in nn : nn, ff = nn[1:], ff[1:]         
+    N = compExp.N
+    # delete 0 counts 
+    gtr0mask = compExp.nn > 0
+    nn, ff = compExp.nn[gtr0mask], compExp.ff[gtr0mask]
 
     hh = nn / N
 
     if which == "Shannon" :
-        output = np.dot( ff , Shannon_oper( hh ) )
+        output = ff.dot(shannon_operator(hh))
 
     elif which == "Simpson" :
-        output = np.dot( ff , Simpson_oper( hh ) )
+        output = ff.dot(simpson_operator(hh))
 
     else :
         raise IOError("FIXME: place holder.")
@@ -154,7 +160,7 @@ def Naive( compExp, which="Shannon", ):
 #  MILLER MADOW ESTIMATOR  #
 ############################
 
-def MillerMadow( compExp, which="Shannon", ): 
+def miller_madow( compExp, which="Shannon", ): 
     '''Entropy estimation with Miller-Madow bias correction.
     
     ref:
@@ -166,7 +172,7 @@ def MillerMadow( compExp, which="Shannon", ):
     N, K = compExp.N, compExp.K
 
     if which == "Shannon" :
-        output = Naive( compExp, which="Shannon" ) + 0.5 * ( K - 1 ) / N
+        output = naive(compExp, which="Shannon") + 0.5 * (K - 1) / N
 
     else :
         raise IOError("FIXME: place holder.")
@@ -179,7 +185,7 @@ def MillerMadow( compExp, which="Shannon", ):
 #  SCHURMANN-GRASSBERGER ESTIMATOR  #
 #####################################
 
-def Schurmann_Grassberger( compExp, which="Shannon", ): 
+def schurmann_grassberger(compExp, which="Shannon",): 
     '''Entropy estimation with Schurmann-Grassberger method.
     
     ref:
@@ -194,40 +200,40 @@ def Schurmann_Grassberger( compExp, which="Shannon", ):
     if 0 in nn : nn, ff = nn[1:], ff[1:]    
 
     if which == "Shannon" :
-        output = ff.dot( nn * D_diGmm(N, nn) ) / N
+        output = ff.dot(nn * D_diGmm(N, nn)) / N
 
     else :
         raise IOError("FIXME: place holder.")
 
-    return np.array( output )
+    return np.array(output)
 ###
 
 #########################
 #  CHAO SHEN ESTIMATOR  #
 #########################
 
-def _GoodTuring_coverage( nn, ff ) :
+def _good_turing_coverage(nn, ff) :
     '''Good-Turing frequency estimation with Zhang-Huang formulation.
     
     ref:
-    Zhang, Z. & Huang, H. Turing’s formula revisited*.
+    Zhang, Z. & Huang, H. Turing's formula revisited*.
     Journal of Quantitative Linguistics 14, 222-241 (2007).
     '''
 
-    N = np.dot( nn, ff )
+    N = ff.dot(nn)
     # Check for the pathological case of all singletons (to avoid coverage = 0)
     # i.e. nn = [1], which means ff = [N]
-    if ff[ np.where( nn == 1 )[0] ] == N :  
+    if ff[np.where(nn == 1)[0]] == N :  
         # this correpsonds to the correction ff_1=N |==> ff_1=N-1
-        GoodTuring = ( N - 1 ) / N                                  
+        GoodTuring = (N - 1) / N                                  
     else :
-        sign = np.power( -1, nn + 1 )
-        binom = 1. / comb(N,nn)
-        GoodTuring = ff.dot( sign * binom )
+        sign = np.power(-1, nn + 1)
+        binom = 1. / comb(N, nn)
+        GoodTuring = ff.dot(sign * binom)
         
     return 1. - GoodTuring
 
-def ChaoShen( compExp, which="Shannon" ):
+def chao_shen(compExp, which="Shannon"):
     '''Entropy estimation with Chao-Shen model (coverage adjusted estimator).
 
     ref: 
@@ -238,20 +244,20 @@ def ChaoShen( compExp, which="Shannon" ):
     # loading parameters from compExp 
     N, nn, ff = compExp.N, compExp.nn, compExp.ff
     # delete unseen categories information, i.e. 0 counts 
-    mask = np.where( nn > 0 )[0]
+    mask = np.where(nn > 0)[0]
     nn, ff = nn[mask], ff[mask]        
    
     # coverage adjusted empirical frequencies  
-    C = _GoodTuring_coverage( nn, ff )                       
+    C = _good_turing_coverage(nn, ff)                       
     p_vec = C * nn / N                         
     # probability to see a bin (specie) in the sample         
-    lambda_vec = 1. - np.power( 1. - p_vec, N )         
+    lambda_vec = 1. - np.power(1. - p_vec, N)         
     
     if which == "Shannon" :
-        output = np.dot( ff, Shannon_oper( p_vec ) / lambda_vec )
+        output = ff.dot(shannon_operator(p_vec) / lambda_vec)
 
     elif which == "Simpson" :
-        output = np.dot( ff, Simpson_oper( p_vec ) / lambda_vec )
+        output = ff.dot(simpson_operator(p_vec) / lambda_vec)
 
     else :
         raise IOError("FIXME: place holder.")
@@ -263,7 +269,7 @@ def ChaoShen( compExp, which="Shannon" ):
 #  DIRICHELET ESTIMATOR  #
 ##########################
 
-def Dirichlet( compExp, a, which="Shannon", ):
+def dirichlet_multinomial_pseudo_count(compExp, a=None, which="Shannon"):
     '''Entropy estimation with Dirichlet-multinomial pseudocount model.
 
     Parameters
@@ -277,7 +283,7 @@ def Dirichlet( compExp, a, which="Shannon", ):
     N, K = compExp.N, compExp.K
     nn, ff = compExp.nn, compExp.ff
 
-    if a == "optimal" :
+    if a == None :
         a = optimal_polya_param(compExp)
     else :
         try:
@@ -291,13 +297,13 @@ def Dirichlet( compExp, a, which="Shannon", ):
     hh_a = (nn + a) / (N + K * a)      
     
     if which == "Shannon" :
-        output = np.dot( ff, Shannon_oper( hh_a ) )
+        output = ff.dot(shannon_operator(hh_a))
 
     elif which == "Simpson" :  
-        output = np.dot( ff, Simpson_oper( hh_a ) )
+        output = ff.dot(simpson_operator(hh_a))
 
     else :
-        raise IOError("Unknown method `Dirichlet` for the chosen quantity.")
+        raise IOError("Unknown method for the chosen quantity.")
 
     return np.array( output )
 ###
@@ -306,15 +312,21 @@ def Dirichlet( compExp, a, which="Shannon", ):
 #  MAX EVIDENCE  #
 ##################
 
-def max_evidence( compExp, which="Shannon", error=False ):
+def dirichlet_multinomial_expected_value(compExp, param=None, which="Shannon", error=False):
     '''Expected entropy with Dirichlet-multinomial at maximum evidence.
 
     '''
-    a_star = optimal_polya_param( compExp )
+    if param == None :
+        a_star = optimal_polya_param(compExp)
+    else :
+        a_star = np.float64(param)
+        if a_star <= 0 :
+            raise IOError('The quantity `param` should be a scalar >0.')
+
     if which == "Shannon" :
-        output = compExp.entropy( a_star )
+        output = compExp.shannon( a_star )
         if error == True :
-            tmp = compExp.squared_entropy( a_star )
+            tmp = compExp.squared_shannon( a_star )
             output = [ output, np.sqrt(tmp - output**2) ]
 
     elif which == "Simpson" :  
@@ -323,7 +335,7 @@ def max_evidence( compExp, which="Shannon", error=False ):
             tmp = compExp.squared_simpson( a_star )
             output = [ output, np.sqrt(tmp - output**2) ]
     else :
-        raise IOError("Unknown method `Dirichlet` for the chosen quantity.")
+        raise IOError("Unknown method for the chosen quantity.")
 
     return np.array( output )
 ###

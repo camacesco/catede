@@ -34,7 +34,7 @@ class nsb_wrapper( ) :
         return self.meta_likelihood.lgscl_maximize([init_guess])
     def lgscl_neglog_evidence_hess(self, var) :
         return self.meta_likelihood.lgscl_neglog_hess(var)
-
+    
 def nsb_estimator(nsb_wrap, error=False, n_bins=None, cpu_count=None, verbose=False) :
     '''Entropy estimators with NSB method.'''
 
@@ -48,6 +48,7 @@ def nsb_estimator(nsb_wrap, error=False, n_bins=None, cpu_count=None, verbose=Fa
     if n_bins == None :
         if verbose == True :
            warnings.warn("The precision is chosen by default.")
+        n_bins = empirical_n_bins(nsb_wrap.cpct_exp.N, nsb_wrap.cpct_exp.K)
     else :
         try :
             n_bins = int(n_bins)
@@ -68,6 +69,9 @@ def nsb_estimator(nsb_wrap, error=False, n_bins=None, cpu_count=None, verbose=Fa
     #  RANGE CHOICE  #
     # <<<<<<<<<<<<<<<<
 
+    # FIXME : 
+    # The max should be of P( alpha(A) | n ) and not of P( alpha | n ) if you integrate in A !!!
+
     #  Find Point for Maximum Likelihood of parameters #  
     a_star = nsb_wrap.optimal_entropy_param() 
     # std dev around the max
@@ -75,7 +79,6 @@ def nsb_estimator(nsb_wrap, error=False, n_bins=None, cpu_count=None, verbose=Fa
     std_a = np.power(Log_evidence_hess, -0.5)
 
     # if std_a small : saddle_point_method = True
-    n_bins = round(empirical_n_bins(nsb_wrap.cpct_exp.N, nsb_wrap.cpct_exp.K))
     saddle_point_method = (n_bins < 2) # only saddle
 
     if saddle_point_method == True :
@@ -97,11 +100,17 @@ def nsb_estimator(nsb_wrap, error=False, n_bins=None, cpu_count=None, verbose=Fa
         #  PRE COMPUTATIONS  #
         # <<<<<<<<<<<<<<<<<<<<
 
-        alpha_vec = centered_logspaced_binning(a_star, std_a, n_bins)
+        # FIXME : 
+        # The max should be of P( alpha(A) | n ) and not of P( alpha | n ) if you integrate in A !!!
+
+        #alpha_vec = centered_logspaced_binning(a_star, std_a, n_bins)
+        alpha_vec = np.append(
+            np.logspace( np.log10( BOUND_DIR[0] ), np.log10(a_star), n_bins//2 )[:-1],
+            np.logspace( np.log10(a_star), np.log10( BOUND_DIR[1] ), n_bins//2+1 )
+            )
 
         #  Compute Posterior (old `Measure Mu`) for alpha #
-        polya = Polya(nsb_wrap.cpct_exp)
-        log_mu_alpha = np.array(list(map(lambda a : polya.log(a), alpha_vec)))
+        log_mu_alpha = Polya(nsb_wrap.cpct_exp).log(alpha_vec)
         log_mu_alpha += nsb_wrap.logmetapr(alpha_vec)
         log_mu_alpha -= np.max(log_mu_alpha) # regularization
         mu_a = np.exp( log_mu_alpha )

@@ -189,8 +189,8 @@ def optimal_equal_KLdiv_param( cpct_div ) :
 #  EXECUTABLE  #
 ################
 
-def main( cpct_div, error=False, n_bins="default", equal_prior=False,
-    choice="log-uniform", scaling=1., cpu_count=None, verbose=False ) :
+def main( cpct_div, error=False, n_bins=None, equal_prior=False, n_sigma=3,
+    choice="log-uniform", scaling=1., cpu_count=None, verbose=False, logscaled=True ) :
     '''Kullback-Leibler divergence estimation with UDM method.'''
 
     # FIXME : developer 
@@ -198,7 +198,7 @@ def main( cpct_div, error=False, n_bins="default", equal_prior=False,
         raise SystemError( "The options `equal_prior` is not available yet."  )
     
     dpm_wrap = dpm_Kullback_Leibler(cpct_div, choice=choice, scaling=scaling)
-    output = dpm_estimator(dpm_wrap, error=error, n_bins=n_bins,
-                           cpu_count=cpu_count, verbose=verbose)
+    output = dpm_estimator(dpm_wrap, error=error, n_bins=n_bins, n_sigma=n_sigma,
+                           cpu_count=cpu_count, verbose=verbose, logscaled=logscaled)
     return output 
  
