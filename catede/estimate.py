@@ -2,19 +2,19 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) February 2023 Francesco Camaglia, LPENS 
+    Copyright (C) April 2023 Francesco Camaglia, LPENS 
 '''
 
 import warnings
 import numpy as np
 import pandas as pd
-from .beta_func_multivar import Experiment_Compact, Divergence_Compact
+from .dirichlet_multinomial import Experiment_Compact, Divergence_Compact
 from . import default_divergence, default_entropy
 
 class Skeleton_Class :
     ''' Auxiliary class for Experiment and Divergence.'''
 
-    def _update_categories( self, categories ):
+    def update_categories( self, categories ):
         '''Change the number of categories.
 
         Parameters
@@ -38,7 +38,8 @@ class Skeleton_Class :
                 self.usr_n_categ = obs_n_categ 
                 if categories < obs_n_categ :
                     warnings.warn("The parameter `categories` is set equal to the observed number of categories.")
-    
+        self._fix_zero_counts()
+        
     def show( self ):
         '''Print a short summary.'''
         
@@ -69,7 +70,7 @@ class Experiment( Skeleton_Class ) :
 
     __doc__ += Skeleton_Class.__doc__
     
-    def __init__( self, data_hist, categories=2, ishist=True ):
+    def __init__(self, data_hist, categories=2, ishist=True):
         '''
         Parameters
         ----------    
@@ -132,20 +133,21 @@ class Experiment( Skeleton_Class ) :
         self.obs_coincedences = self.counts_hist[ self.counts_hist.index > 1 ].sum()
 
         #  Load categories  #
-        categories = np.max([categories, len(data_hist)])
-        self._update_categories( categories )
+        categories = np.max([categories, self.obs_n_categ])
+        self.update_categories( categories )
 
+    def _fix_zero_counts( self ) :
+        ''' (internal) add/remove 0 to counts_hist.'''
         if self.usr_n_categ > self.obs_n_categ :
-            self.counts_hist[ 0 ] = self.usr_n_categ - self.obs_n_categ
+            self.counts_hist.at[0] = self.usr_n_categ - self.obs_n_categ
             self.counts_hist = self.counts_hist.sort_index(ascending=True) 
+        elif self.usr_n_categ == self.obs_n_categ :
+            if 0 in self.counts_hist.index :
+                self.counts_hist.drop(index=[0], inplace=True)
+        else :
+            raise ValueError('Interal inconsistecy between n. of categories.')
 
-    def shannon( self, method="naive", unit="ln", **kwargs ):
-        # create an alias to use for clarity
-        __doc__ = self.entropy.__doc___
-
-        return self.entropy( method=method, unit=unit, **kwargs)
-
-    def entropy( self, method="naive", unit="ln", **kwargs ):
+    def shannon(self, method="naive", unit="ln", **kwargs):
         '''Estimate Shannon entropy.
 
         Shannon entropy estimation through a chosen `method`.
@@ -178,7 +180,7 @@ class Experiment( Skeleton_Class ) :
     def simpson( self, method="naive", **kwargs ):
         '''Estimate Simpson index.
 
-        Simpson infrx estimation through a chosen `method`.
+        Simpson index estimation through a chosen `method`.
         The unit (of the logarithm) can be specified with the parameter `unit`.
 
         return numpy.array
@@ -243,31 +245,25 @@ class Divergence( Skeleton_Class ) :
             "Exp-2":my_exp_2.obs_n_categ,
             "Union":len(self.data_hist.loc[(df>0).any(axis=1)])}
             )
-        # User Stated Categories
-        categories = np.max([my_exp_1.usr_n_categ, my_exp_2.usr_n_categ, self.obs_n_categ["Union"]])
-        self._update_categories( categories )
 
         # Counts Histogram
         self.counts_hist = df.groupby(by=["Exp-1", "Exp-2"]).size()
         self.counts_hist.name = "freq"
-        # add (0,0) to counts_hist
-        if self.usr_n_categ > self.obs_n_categ["Union"] :
-            self.counts_hist[(0,0)] = self.usr_n_categ - self.obs_n_categ["Union"]
-            self.counts_hist = self.counts_hist.sort_index(ascending=True)
-        
+
+        # User Stated Categories
+        categories = np.max([my_exp_1.usr_n_categ, my_exp_2.usr_n_categ, self.obs_n_categ["Union"]])
+        self.update_categories( categories )
+
         # WARNING!: is this a deep copy ?
         tmp = self.counts_hist.reset_index(level=[0,1]).copy()
         # experiment 1 copy
-        self.exp_1 = Experiment( my_exp_1.data_hist )
-        self.exp_1._update_categories( self.usr_n_categ )
+        self.exp_1 = Experiment(my_exp_1.data_hist, categories=self.usr_n_categ)
         counts_1 = tmp[["freq", "Exp-1"]].set_index("Exp-1", drop=True)
         self.exp_1.counts_hist = counts_1["freq"] # convert to series
         # experiment 2 copy
-        self.exp_2 = Experiment( my_exp_2.data_hist )
-        self.exp_2._update_categories( self.usr_n_categ )
+        self.exp_2 = Experiment(my_exp_2.data_hist, categories=self.usr_n_categ)
         counts_2 = tmp[["freq", "Exp-2"]].set_index("Exp-2", drop=True)
         self.exp_2.counts_hist = counts_2["freq"]
-
 
     def compact( self ) :
         '''It provides aliases for computations.'''
@@ -287,6 +283,17 @@ class Divergence( Skeleton_Class ) :
         '''It saves the compact version of Divergence to `filename`.'''
         self.compact( )._save( filename )
 
+    def _fix_zero_counts( self ) :
+        ''' (internal) add/remove (0,0) to counts_hist.'''
+        if self.usr_n_categ > self.obs_n_categ["Union"] :
+            self.counts_hist.at[(0,0)] = self.usr_n_categ - self.obs_n_categ["Union"]
+            self.counts_hist = self.counts_hist.sort_index(ascending=True)
+        elif self.usr_n_categ == self.obs_n_categ["Union"] :
+            if (0,0) in self.counts_hist.index :
+                self.counts_hist.drop(index=(0,0), inplace=True)
+        else :
+            raise ValueError('Interal inconsistecy between n. of categories.')
+        
     '''
     Divergence methods.
 
@@ -306,7 +313,7 @@ class Divergence( Skeleton_Class ) :
         - "ln": natural logarithm (default);
         - "log2": base 2 logarihtm;
         - "log10":base 10 logarithm.
-        '''
+    '''
 
     def kullback_leibler( self, method="naive", unit="ln", **kwargs ):
         '''Estimate Kullback-Leibler divergence.

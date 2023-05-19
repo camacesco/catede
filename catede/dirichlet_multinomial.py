@@ -3,7 +3,7 @@
 
 '''
     Multivariate Beta Function Calculus (in development)
-    Copyright (C) February 2023 Francesco Camaglia, LPENS 
+    Copyright (C) April 2023 Francesco Camaglia, LPENS 
 '''
 import warnings
 import numpy as np
@@ -180,7 +180,7 @@ class Experiment_Compact :
     
     ''' *** Polya Posterior Methods *** '''
 
-    def entropy( self, a ) :
+    def shannon( self, a ) :
         '''Expected Shannon entropy under Polya posterior.
             - sum_i < q_i ln(q_i) | n ; a >
         '''
@@ -188,7 +188,7 @@ class Experiment_Compact :
         sum_value = - self._norm_ffsum( sumGens, a, dim=1 )
         return sum_value
 
-    def squared_entropy( self, a ) :
+    def squared_shannon( self, a ) :
         '''Expected squared Shannon entropy under Polya posterior.
             sum_ij < q_i q_j ln(q_i) ln(q_j) | n ; a > 
         '''

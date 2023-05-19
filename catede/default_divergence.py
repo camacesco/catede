@@ -8,23 +8,23 @@
 
 import warnings
 import numpy as np 
-from .kullback_leibler_divergence import main as _DKL_estimator
-from .squared_hellinger_divergence import main as _DH2_estimator
+from .dpm.kullback_leibler import main as _DKL_dpm_estimator
+from .dpm.squared_hellinger import main as _DH2_dpm_estimator
 from .default_entropy import _unit_Dict_
-from .new_calculus import optimal_dirichlet_param
+from .bayesian_calculus import optimal_polya_param
 from scipy.special import rel_entr
-from .beta_func_multivar import D_diGmm
+from .dirichlet_multinomial import D_diGmm
 
 _method_List_ = [
-    "naive", "maximum-likelihood",
+    "naive", 
+    "cat", "categorical",
+    "max_evidence",
     "DPM", 
     "Zh", "Zhang-Grabchak",
-    "Di", "Dirichlet", 
     "Je", "Jeffreys", 
     "La", "Laplace", 
     "Tr", "mm", "minimax", "Trybula", 
     "Pe", "Perks",
-    "max_evidence",
 ]
 
 _which_List_ = ["squared-Hellinger", "Jensen-Shannon", "Kullback-Leibler", "symmetrized-KL"]
@@ -33,28 +33,28 @@ _which_List_ = ["squared-Hellinger", "Jensen-Shannon", "Kullback-Leibler", "symm
 #  ALIASES  #
 #############
 
-def KullbackLeibler_oper( x, y ) :
+def KullbackLeibler_oper(x, y) :
     ''' x * log(x/y) '''
-    return rel_entr(x,y)
+    return rel_entr(x, y)
 
-def symmetric_KL_oper( x, y ) :
+def symmetric_KL_oper(x, y) :
     ''' 0.5 * ( x * log(x/y) + y * log(y/x)) '''
-    return 0.5 * ( rel_entr(x,y) + rel_entr(y,x) )
+    return 0.5 * (rel_entr(x,y) + rel_entr(y,x))
 
-def JensenShannon_oper( x, y ) :
+def JensenShannon_oper(x, y) :
     '''   '''
-    mm = 0.5 * ( x + y )
-    return 0.5 * ( KullbackLeibler_oper( x, mm ) + KullbackLeibler_oper( y, mm ) )
+    mm = 0.5 * (x + y)
+    return 0.5 * (KullbackLeibler_oper(x, mm) + KullbackLeibler_oper(y, mm))
 
-def Bhattacharyya_oper( x, y ) :
+def Bhattacharyya_oper(x, y) :
     ''' sqrt( x * y ) '''
-    return np.sqrt( np.multiply( x, y ) ) 
+    return np.sqrt(np.multiply(x, y)) 
 
 #################
 #  SWITCHBOARD  #
 #################
 
-def switchboard( comp_div, method="naive", which="Kullback-Leibler", unit="default", **kwargs ):
+def switchboard(comp_div, method="naive", which="Kullback-Leibler", unit="default", **kwargs):
 
     # check which 
     if which not in _which_List_ :
@@ -70,63 +70,53 @@ def switchboard( comp_div, method="naive", which="Kullback-Leibler", unit="defau
         
     # choosing entropy estimation method
     if method in ["naive", "maximum-likelihood"] :  
-        divergence_estimate = Naive( comp_div, which=which, **kwargs )
+        divergence_estimate = naive(comp_div, which=which)
     
     elif method in ["DPM"] :       
-        if which in ["Jensen-Shannon"] :
+        if which == "Jensen-Shannon" :
             raise IOError(f"Unknown method `{method}` for {which}.")
         elif which == "Kullback-Leibler" :
-            divergence_estimate = _DKL_estimator( comp_div, **kwargs )
+            divergence_estimate = _DKL_dpm_estimator(comp_div, **kwargs)
         elif which == "squared-Hellinger" :
-            divergence_estimate = _DH2_estimator( comp_div, **kwargs )
+            divergence_estimate = _DH2_dpm_estimator(comp_div, **kwargs)
         elif which == "symmetrized-KL" :
             raise SystemError("To be coded...")
     
     elif method in ["Zh", "Zhang-Grabchak"] :
         if which in ["Kullback-Leibler", "symmetrized-KL"] :
-            divergence_estimate = Zhang( comp_div, which=which, **kwargs )
+            divergence_estimate = zhang(comp_div, which=which)
         else :
             raise IOError(f"Unknown method `{method}` for {which}.")
-
-    elif method in ["Di", "Dirichlet"] :
-        a = kwargs.get("a", None)
-        b = kwargs.get("b", None)
         
-        if a is None :
-            a = "optimal"
-            #warnings.warn("Dirichlet parameter `a` falling back to `optimal`.")
-        if b is None :
-            b = "optimal"
-            #warnings.warn("Dirichlet parameter `b` falling back to `optimal`.")
-
-        divergence_estimate = Dirichlet( comp_div, a, b, which=which )  
-
     elif method in ["max_evidence"] :
-        divergence_estimate = max_evidence( comp_div, which=which, **kwargs )
+        divergence_estimate = dirichlet_multinomial_expected_value(comp_div, which=which, **kwargs)
 
-    elif method in ["Je", "Jeffreys", "Krichevsky-Trofimov"] :
-        a = 0.5
-        b = 0.5
-        divergence_estimate = Dirichlet( comp_div, a, b, which=which )
+    elif method in ["categorical"] :
+        divergence_estimate = dirichlet_multinomial_expected_value(comp_div, params=[1,1], which=which, **kwargs)
+
+    elif method in ["Je", "Jeffreys"] :
+        params = np.array([0.5, 0.5])
+        divergence_estimate = dirichlet_multinomial_pseudo_count(comp_div, params, which=which)
     
     elif method in ["La", "Laplace", "Bayesian-Laplace"] :
-        a = 1.
-        b = 1.
-        divergence_estimate = Dirichlet( comp_div, a, b, which=which )
+        params = np.array([1., 1.])
+        divergence_estimate = dirichlet_multinomial_pseudo_count(comp_div, params, which=which)
         
     elif method in ["Tr", "mm", "minimax", "Trybula"]:  
         a = np.sqrt( comp_div.N_1 ) / comp_div.compact_1.K
         b = np.sqrt( comp_div.N_2 ) / comp_div.compact_2.K
-        divergence_estimate = Dirichlet( comp_div, a, b, which=which )
+        params = np.array([a, b])
+        divergence_estimate = dirichlet_multinomial_pseudo_count(comp_div, params, which=which)
      
     elif method in ["Pe", "Perks", "SG", "Schurmann-Grassberger"]:
         a = 1. / comp_div.compact_1.Kobs
         b = 1. / comp_div.compact_2.Kobs
-        divergence_estimate = Dirichlet( comp_div, a, b, which=which )
+        params = np.array([a, b])
+        divergence_estimate = dirichlet_multinomial_pseudo_count(comp_div, params, which=which)
 
     else:
-        raise IOError(f"Unkown method{method}\n Please choose method amongst the following:\n", _method_List_ )
-
+        raise IOError(f"Unkown method `{method}`.\n Please choose amongst :\n", _method_List_)
+    
     return unit_conv * divergence_estimate
 ###
 
@@ -134,8 +124,10 @@ def switchboard( comp_div, method="naive", which="Kullback-Leibler", unit="defau
 #  NAIVE  #
 ###########
 
-def Naive( comp_div, which="Kullback-Leibler", **kwargs) :
-    '''Estimation of divergence with frequencies of observed categories.'''
+def naive(comp_div, which="Kullback-Leibler") :
+    '''Estimation of divergence with frequencies of observed categories.
+    All counts equal to 0 are not considered.
+    '''
     
     # loading parameters from comp_div 
     N_1, N_2 = comp_div.N_1, comp_div.N_2
@@ -147,19 +139,19 @@ def Naive( comp_div, which="Kullback-Leibler", **kwargs) :
     hh_2 = nn_2 / N_2                  # frequencies
     
     if which == "Jensen-Shannon" :
-        output = np.dot( ff, JensenShannon_oper( hh_1, hh_2 ) )
+        output = ff.dot(JensenShannon_oper(hh_1, hh_2))
 
     elif which == "Kullback-Leibler" :                       
-        output = np.dot( ff, KullbackLeibler_oper( hh_1, hh_2 ) )
-    
+        output = ff.dot(KullbackLeibler_oper(hh_1, hh_2))
+
     elif which == "symmetrized-KL" :                       
-        output = np.dot( ff, symmetric_KL_oper( hh_1, hh_2 ) )
+        output = ff.dot(symmetric_KL_oper(hh_1, hh_2))
 
     elif which == "squared-Hellinger" :  
-        output = 1 - np.dot( ff, Bhattacharyya_oper( hh_1, hh_2 ) )
+        output = 1 - ff.dot(Bhattacharyya_oper(hh_1, hh_2))
 
     else :
-        raise IOError("Unknown method `Naive` for the chosen divergence.")
+        raise IOError("Unknown method for the chosen divergence.")
 
     return np.array( output )
 
@@ -168,7 +160,7 @@ def Naive( comp_div, which="Kullback-Leibler", **kwargs) :
 #  ZHANG ESTIMATOR  #
 #####################
 
-def Zhang( comp_div, which="Kullback-Leibler", CPU_Count=None, **kwargs ) :
+def zhang( comp_div, which="Kullback-Leibler", CPU_Count=None) :
     ''' Z estimator for the DKL.
 
     Zhang, Z. & Grabchak, M. Nonparametric Estimation of Küllback-Leibler Divergence.
@@ -185,16 +177,16 @@ def Zhang( comp_div, which="Kullback-Leibler", CPU_Count=None, **kwargs ) :
     N_1, N_2 = comp_div.N_1, comp_div.N_2
 
     if which == "Kullback-Leibler" : 
-        output = ff.dot( nn_1 * ( D_diGmm(N_2+1, nn_2+1) - D_diGmm(N_1, nn_1) ) ) / N_1
+        output = ff.dot(nn_1 * (D_diGmm(N_2+1, nn_2+1) - D_diGmm(N_1, nn_1))) / N_1
 
     elif which == "symmetrized-KL" :  
-        output = 0.5 * ff.dot( nn_1 * ( D_diGmm(N_2+1, nn_2+1) - D_diGmm(N_1, nn_1) ) ) / N_1
+        output = 0.5 * ff.dot(nn_1 * (D_diGmm(N_2+1, nn_2+1) - D_diGmm(N_1, nn_1))) / N_1
         mask = comp_div.nn_2 > 0
         nn_1, nn_2, ff = comp_div.nn_1[mask], comp_div.nn_2[mask], comp_div.ff[mask]
-        output += 0.5 * ff.dot( nn_2 * ( D_diGmm(N_1+1, nn_1+1) - D_diGmm(N_2, nn_2) ) ) / N_2
+        output += 0.5 * ff.dot(nn_2 * (D_diGmm(N_1+1, nn_1+1) - D_diGmm(N_2, nn_2))) / N_2
 
     else :
-        raise IOError("Unknown method `Zhang` for the chosen divergence.")
+        raise IOError("Unknown method for the chosen divergence.")
 
     return np.array( output )
 
@@ -202,24 +194,21 @@ def Zhang( comp_div, which="Kullback-Leibler", CPU_Count=None, **kwargs ) :
 #  DIRICHLET ESTIMATOR  #
 ##########################
 
-def Dirichlet( comp_div, a, b, which="Kullback-Leibler", **kwargs ):
+def dirichlet_multinomial_pseudo_count( comp_div, params=None, which="Kullback-Leibler"):
     '''Estimation of divergence with Dirichlet-multinomial pseudocount model.'''
     # check options
-    if a == "optimal" :
-        a = optimal_dirichlet_param(comp_div.compact_1)
+    if np.any(np.array(params) == None) :
+        a = optimal_polya_param(comp_div.compact_1)
+        b = optimal_polya_param(comp_div.compact_2)
     else :
         try:
-            a = np.float64(a)
+            a = np.float64(params[0])
         except :
             raise IOError('The concentration parameter `a` must be a scalar.')
         if a < 0 :
             raise IOError('The concentration parameter `a` must greater than 0.')
-
-    if b == "optimal" :
-        b = optimal_dirichlet_param(comp_div.compact_2)
-    else :
         try:
-            b = np.float64(b)
+            b = np.float64(params[1])
         except :
             raise IOError('The concentration parameter `b` must be a scalar.')
         if b < 0 :
@@ -229,23 +218,23 @@ def Dirichlet( comp_div, a, b, which="Kullback-Leibler", **kwargs ):
     N_1, N_2, K = comp_div.N_1, comp_div.N_2, comp_div.K
     nn_1, nn_2, ff = comp_div.nn_1, comp_div.nn_2, comp_div.ff
 
-    hh_1_a = ( nn_1 + a ) / ( N_1 + K*a )     # frequencies with pseudocounts
-    hh_2_b = ( nn_2 + b ) / ( N_2 + K*b )     # frequencies with pseudocounts
+    hh_1_a = (nn_1 + a) / (N_1 + K*a)     # frequencies with pseudocounts
+    hh_2_b = (nn_2 + b) / (N_2 + K*b)     # frequencies with pseudocounts
 
     if which == "Jensen-Shannon" :
-        output = np.dot( ff, JensenShannon_oper( hh_1_a, hh_2_b ) )
+        output = ff.dot(JensenShannon_oper(hh_1_a, hh_2_b))
 
     elif which == "Kullback-Leibler" :                               
-        output = np.dot( ff, KullbackLeibler_oper( hh_1_a, hh_2_b ) )
+        output = ff.dot(KullbackLeibler_oper(hh_1_a, hh_2_b))
 
     elif which == "symmetrized-KL" :                       
-        output = np.dot( ff, symmetric_KL_oper( hh_1_a, hh_2_b ) )
+        output = ff.dot(symmetric_KL_oper(hh_1_a, hh_2_b))
 
     elif which == "squared-Hellinger" :  
-        output = 1 - np.dot( ff, Bhattacharyya_oper( hh_1_a, hh_2_b ) )
+        output = 1 - ff.dot(Bhattacharyya_oper(hh_1_a, hh_2_b))
 
     else :
-        raise IOError("Unknown method `Dirichlet` for the chosen quantity.")
+        raise IOError("Unknown method for the chosen quantity.")
 
     return np.array( output )
 ###
@@ -255,29 +244,44 @@ def Dirichlet( comp_div, a, b, which="Kullback-Leibler", **kwargs ):
 #  MAX_EVIDENCE  #
 ##########################
 
-def max_evidence( comp_div, which="Kullback-Leibler", error=False, ):
-    '''Estimation of divergence with Dirichlet-multinomial pseudocount model.'''
-    a_star = optimal_dirichlet_param(comp_div.compact_1)
-    b_star = optimal_dirichlet_param(comp_div.compact_2)
+def dirichlet_multinomial_expected_value(comp_div, params=None, which="Kullback-Leibler", error=False,):
+    '''Expected value of the divergence under Dirichlet-multinomial.'''
 
+    if np.any(np.array(params) == None) :
+        a = optimal_polya_param(comp_div.compact_1)
+        b = optimal_polya_param(comp_div.compact_2)
+    else :
+        try:
+            a = np.float64(params[0])
+        except :
+            raise IOError('The concentration parameter `a` must be a scalar.')
+        if a < 0 :
+            raise IOError('The concentration parameter `a` must greater than 0.')
+        try:
+            b = np.float64(params[1])
+        except :
+            raise IOError('The concentration parameter `b` must be a scalar.')
+        if b < 0 :
+            raise IOError('The concentration parameter `b` must greater than 0.')
+        
     if which == "Kullback-Leibler" :                               
-        output = comp_div.kullback_leibler( a_star, b_star )
+        output = comp_div.kullback_leibler(a, b)
         if error == True :
-            tmp = comp_div.squared_kullback_leibler( a_star, b_star )
-            output = [ output, np.sqrt(tmp-output**2) ]
+            tmp = comp_div.squared_kullback_leibler(a, b)
+            output = [output, np.sqrt(tmp - output**2)]
 
     elif which == "symmetrized-KL" :                       
         raise SystemError("To be coded...")
 
     elif which == "squared-Hellinger" :  
-        tmp1 = comp_div.bhattacharyya( a_star, b_star )
+        tmp1 = comp_div.bhattacharyya(a, b)
         output = 1 - tmp1
         if error == True :
-            tmp2 = comp_div.squared_bhattacharyya( a_star, b_star )
-            output = [ output, np.sqrt(tmp2-tmp1**2) ]
+            tmp2 = comp_div.squared_bhattacharyya(a, b)
+            output = [output, np.sqrt(tmp2 - tmp1**2)]
 
     else :
-        raise IOError("Unknown method `Dirichlet` for the chosen quantity.")
+        raise IOError("Unknown method for the chosen quantity.")
 
-    return np.array( output )
+    return np.array(output)
 ###

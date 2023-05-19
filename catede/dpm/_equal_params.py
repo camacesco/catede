@@ -12,7 +12,24 @@ import numpy as np
 from mpmath import mp
 import multiprocessing
 from tqdm import tqdm
-from .new_calculus import *
+from ..bayesian_calculus import *
+
+class dpm_wrapper( ) :
+    ''' Common functions for all wrapper'''
+    def metapr( self, var ) :
+        return self.dir_meta_obj.metapr(var)
+    def logmetapr( self, var ) :
+        return self.dir_meta_obj.logmetapr(var)
+    def optimal_divergence_params(self) :
+        init_guess_a = optimal_polya_param(self.cpct_div.compact_1)
+        init_guess_b = optimal_polya_param(self.cpct_div.compact_2)
+        return self.meta_likelihood.maximize([init_guess_a, init_guess_b])
+    def neglog_evidence_hess(self, var) :
+        return self.meta_likelihood.neglog_hess( var )
+    
+###################
+#  DPM ESTIMATOR  #
+###################
 
 def dpm_estimator( dpm_wrap, error=False, n_bins="default", equal_prior=False, cpu_count=None, verbose=False, ) :
     '''Divergence estimator with DPM method.'''
@@ -62,11 +79,17 @@ def dpm_estimator( dpm_wrap, error=False, n_bins="default", equal_prior=False, c
 
     #  Find Point of maximum evidence #   
     if equal_prior is True :
-        a_star = dpm_wrap.optimal_equal_param( )
+        a_star = dpm_wrap.optimal_equal_param()
     else :
-        a_star, b_star = dpm_wrap.optimal_divergence_params( )
+        a_star, b_star = dpm_wrap.optimal_divergence_params()
 
-    if saddle_point_method is True :
+    neglog_evidence_hess = dpm_wrap.neglog_evidence_hess( a_star, b_star )
+    std_a = np.power(neglog_evidence_hess[:,0,0], -0.5)
+    std_b = np.power(neglog_evidence_hess[:,1,1], -0.5)
+
+    # np.all([std_a, std_n]) small : saddle_point_method = True
+
+    if saddle_point_method == True :
 
         # 
         #  SADDLE POINT  #
@@ -90,28 +113,31 @@ def dpm_estimator( dpm_wrap, error=False, n_bins="default", equal_prior=False, c
         # they should be a method of compact experiments probably
         # and vectorialized
 
-        if equal_prior is True :
+        if equal_prior == True :
+            '''
+            # FIXME
             Log_evidence_hess = dpm_wrap.log_equal_evidence_hess( a_star )
-            std_a = np.power( - Log_evidence_hess, -0.5 )
+            std_a = np.power(Log_evidence_hess, -0.5)
             # alpha
             alpha_vec = centered_logspaced_binning( a_star, std_a, n_bins )
             log_mu_alpha = list(map(lambda a : Polya(a, dpm_wrap.comp_div.compact_1).log() + Polya(a, dpm_wrap.comp_div.compact_2).log(), alpha_vec ))   
             log_mu_alpha -= np.max( log_mu_alpha ) # regularization
             mu_alpha = np.exp( log_mu_alpha )
+            '''
+            pass
 
         else :
-            
-            Log_evidence_hess = dpm_wrap.log_evidence_hess( a_star, b_star )
-            std_a = np.power( - Log_evidence_hess[:,0,0], -0.5 )
-            std_b = np.power( - Log_evidence_hess[:,1,1], -0.5 )
+
             # alpha
             alpha_vec = centered_logspaced_binning( a_star, std_a, n_bins )
-            log_mu_alpha = list(map(lambda a : Polya(a, dpm_wrap.comp_div.compact_1).log(), alpha_vec ))   
+            polya_a = Polya(dpm_wrap.comp_div.compact_1)
+            log_mu_alpha = list(map(lambda a : polya_a.log(a), alpha_vec ))   
             log_mu_alpha -= np.max( log_mu_alpha ) # regularization
             mu_alpha = np.exp( log_mu_alpha )
             # beta
             beta_vec = centered_logspaced_binning( b_star, std_b, n_bins )
-            log_mu_beta = list(map(lambda b : Polya(b, dpm_wrap.comp_div.compact_2).log(), beta_vec )) 
+            polya_b = Polya(dpm_wrap.comp_div.compact_2)
+            log_mu_beta = list(map(lambda b : polya_b.log(b), beta_vec )) 
             log_mu_beta -= np.max( log_mu_beta ) # regularization
             mu_beta = np.exp( log_mu_beta )
 
@@ -137,13 +163,13 @@ def dpm_estimator( dpm_wrap, error=False, n_bins="default", equal_prior=False, c
         #  DIV2 estimator vs alpha,beta  #
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
             
-        if error is True :
+        if error == True :
             tqdm_args = tqdm(args, total=len(args), desc='Squared...', disable=disable)
-            if equal_prior is True :
-                all_DIV2_a = POOL.starmap( dpm_wrap.squared_divergence, tqdm_args )
+            if equal_prior == True :
+                all_DIV2_a = POOL.starmap(dpm_wrap.squared_divergence, tqdm_args)
             else :
-                all_DIV2_ab = POOL.starmap( dpm_wrap.squared_divergence, tqdm_args )
-                all_DIV2_ab = np.asarray( all_DIV2_ab ).reshape( len(alpha_vec), len(beta_vec) )
+                all_DIV2_ab = POOL.starmap(dpm_wrap.squared_divergence, tqdm_args)
+                all_DIV2_ab = np.asarray(all_DIV2_ab).reshape(len(alpha_vec), len(beta_vec))
 
         POOL.close()
     
@@ -180,6 +206,6 @@ def dpm_estimator( dpm_wrap, error=False, n_bins="default", equal_prior=False, c
 
     estimate = np.array( dpm_wrap.estim_mean(DIV1) ) 
     if error is True :
-        estimate = np.append( estimate, [dpm_wrap.estim_std(DIV1, DIV2)] )   
+        estimate = np.append( estimate, [dpm_wrap.estim_std(DIV1, DIV2)] )
         
     return np.float64( estimate )
