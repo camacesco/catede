@@ -238,6 +238,14 @@ class Divergence_Compact :
             self.ff = div.counts_hist.values                             # recurrency of counts
             self.compact_1 = Experiment_Compact( source=div, is_div=1 )  # compact for Exp 1
             self.compact_2 = Experiment_Compact( source=div, is_div=2 )  # compact for Exp 1
+    
+    def reverse( self ) :
+        '''Switch experiments within a Divergence_compact object.'''
+
+        self.N_1, self.N_2 = self.N_2, self.N_1
+        self.Kobs_1, self.Kobs_2 = self.Kobs_2, self.Kobs_1
+        self.nn_1, self.nn_2 = self.nn_2, self.nn_1
+        self.compact_1, self.compact_2 = self.compact_2, self.compact_1
 
     def _ffsum( self, sumList, dim ) :
         return count_hist_sum_( self.ff, sumList, dim )
@@ -339,7 +347,7 @@ class Divergence_Compact :
         sumGens = ( Q2logQ2 - 2 * Q2logQlogT + Q2logT2 for Q2logQ2, Q2logQlogT, Q2logT2 in gens )
 
         return self.compact_1._norm_ffsum( sumGens, a, dim=2 )
-
+    
     def bhattacharyya( self, a, b ) :
         '''Posterior Bhattacharyya coefficient estimator.
             sum_i < sqrt{q_i} sqrt{t_i} | n, m ; a, b > 
