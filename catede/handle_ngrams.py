@@ -134,7 +134,7 @@ class ngram_gear:
                 self.alphabet = _Alphabet_[ alph ][0] 
                 
             # assign empty data_hist
-            self.data_hist = pd.Series()
+            self.data_hist = pd.Series(dtype=object)
  
         self.assign_features( skip=skip, beg=beg, end=end )
 
@@ -168,7 +168,7 @@ class ngram_gear:
 
     def clean_hist( self ) :
         ''' Clean the attribute <data_hist>. ''' 
-        self.assign_hist( pd.Series() )
+        self.assign_hist( pd.Series(dtype=object) )
     ###
     
     # >>>>>>>>>>>>>>>>>>>

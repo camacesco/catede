@@ -337,16 +337,16 @@ class Divergence( Skeleton_Class ) :
         
         return default_divergence.switchboard( self.compact(), method=method, which="Jensen-Shannon", unit=unit, **kwargs )
 
-    def symmetrized_KL( self, method="naive", unit="ln", **kwargs ):
+    def symmetric_KL( self, method="naive", unit="ln", **kwargs ):
         '''Estimate symmetric Kullback-Leibler divergence.
 
-        Symmetrized Kullback-Leibler divergence estimation through a chosen `method`.
+        Symmetric Kullback-Leibler divergence estimation through a chosen `method`.
         The unit (of the logarithm) can be specified with the parameter `unit`.
 
         return numpy.array
         '''
         
-        return default_divergence.switchboard( self.compact(), method=method, which="symmetrized-KL", unit=unit, **kwargs )
+        return default_divergence.switchboard( self.compact(), method=method, which="symmetric-KL", unit=unit, **kwargs )
 
 
     def squared_hellinger( self, method="naive", **kwargs ):
