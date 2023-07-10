@@ -12,4 +12,18 @@ The package _catede_ can be installed by using the setup.py script :
 
  ```python setup.py install```.
 
- ## References
+## References
+
+`Missing Paper`
+
+## Tutorial
+
+A brief tutorial can be found [here](tutorial.ipynb).
+
+## Contact
+
+Any issues or questions should be addressed to [us](mailto:francesco.camaglia@phys.ens.fr).
+
+## License
+
+Free use of catede is granted under the terms of the GNU General Public License version 3 (GPLv3).
