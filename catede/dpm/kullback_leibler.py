@@ -3,7 +3,7 @@
 
 '''
     Kullback-Leibler Divergence Estimator
-    Copyright (C) February 2023 Francesco Camaglia, LPENS 
+    Copyright (C) June 2023 Francesco Camaglia, LPENS 
 '''
 
 import numpy as np

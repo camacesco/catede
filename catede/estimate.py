@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) April 2023 Francesco Camaglia, LPENS 
+    Copyright (C) June 2023 Francesco Camaglia, LPENS 
 '''
 
 import warnings
@@ -53,7 +53,7 @@ class Skeleton_Class :
         print(self.obs_n_categ, ' (observed)')
         print(self.usr_n_categ, ' (a priori)')
         
-        print("Recurrencies:")
+        print("Multiplicities:")
         print(self.counts_hist)
     
 ######################
@@ -61,12 +61,7 @@ class Skeleton_Class :
 ######################
 
 class Experiment( Skeleton_Class ) :
-    '''A class for entropy estimation from data distribution.
-    
-    Methods
-    -------
-    entropy( method="naive", unit="ln", **kwargs )
-        Estimate Shannon entropy.'''
+    '''A class for entropy estimation from data distribution.'''
 
     __doc__ += Skeleton_Class.__doc__
     
@@ -147,30 +142,38 @@ class Experiment( Skeleton_Class ) :
         else :
             raise ValueError('Interal inconsistecy between n. of categories.')
 
+        '''
+        Entropy methods.
+
+        Parameters
+        ----------
+        method: str
+            the name of the estimation method:
+            - "naive" : naive estimator (default);
+            - "naive" : naive estimator (default);
+            - "MM" : Miller-Madow estimator;
+            - "Pe", Perks pseudocunt,
+            - "La" : Laplace pseudocount estimator;
+            - "Je" : Jeffreys pseudocount estimator (Krichevsky-Trofimov);
+            - "Tr" : Trybula pseudocount estimator (minimax); 
+            - "SG" : Schurmann-Grassberger estimator;
+            - "CS" : Chao-Shen estimator (coverage-adjusted); 
+            - "DC" : Dirichlet categorical estimator;
+            - "DP" : Dirichlet prior estimator (maximum evidence);
+            - "NSB", "Nemenmann-Shafee-Bialek".
+
+        unit: str, optional
+            the divergence logbase unit:
+            - "ln": natural logarithm (default);
+            - "log2": base 2 logarihtm;
+            - "log10":base 10 logarithm.
+        '''
+
     def shannon(self, method="naive", unit="ln", **kwargs):
         '''Estimate Shannon entropy.
 
         Shannon entropy estimation through a chosen `method`.
         The unit (of the logarithm) can be specified with the parameter `unit`.
-            
-        Parameters
-        ----------
-        method: str
-            the name of the entropy estimation method:
-            - "naive": naive estimator (default);
-            - "MM": Miller Madow estimator;
-            - "CS": Chao Shen estimator;       
-            - "shrink": shrinkage estimator;       
-            - "Jeffreys": Jeffreys estimator;
-            - "Laplace": Laplace estimator;
-            - "SG": Schurmann-Grassberger estimator;
-            - "minimax": minimax estimator;
-            - "NSB": Nemenman Shafee Bialek estimator.
-        unit: str, optional
-            the entropy logbase unit:
-            - "ln": natural logarithm (default);
-            - "log2": base 2 logarihtm;
-            - "log10":base 10 logarithm.
 
         return numpy.array
         '''
@@ -202,15 +205,7 @@ class Experiment( Skeleton_Class ) :
 ######################
 
 class Divergence( Skeleton_Class ) :
-    
-    '''The basic class for estimating divergence between two dataset distributions.
-
-    Methods
-    -------
-    jensen_shannon( method="naive", unit="ln", **kwargs ):
-        Estimate Jensen-Shannon divergence.
-    kullback_leibler( method="naive", unit="ln", **kwargs )
-        Estimate Kullback-Leibler divergence.'''
+    '''The basic class for estimating divergence between two dataset distributions.'''
 
     __doc__ += Skeleton_Class.__doc__
 
@@ -301,13 +296,14 @@ class Divergence( Skeleton_Class ) :
     ----------
     method: str
         the name of the estimation method:
-        - ["naive", "maximum-likelihood"] : naive estimator (default);
-        - "DPM" : Camaglia Mora Walczak estimator.
-        - ["Jeffreys", "Krichevsky-Trofimov"] : Jeffreys estimator;
-        - ["L", "Laplace", "Bayesian-Laplace"] : Laplace estimator;
-        - ["SG", "Schurmann-Grassberger"] : Schurmann-Grassberger estimator;
-        - ["minimax", "Trybula"] : minimax estimator; 
-        - ["D", "Dirichlet"] : Dirichlet   
+        - "naive" : naive estimator (default);
+        - "La" : Laplace pseudocount estimator;
+        - "Je" : Jeffreys pseudocount estimator (Krichevsky-Trofimov);
+        - "Tr" : Trybula pseudocount estimator (minimax); 
+        - "Zh" : Zhang-Grabchak estimator;
+        - "DC" : Dirichlet categorical estimator;
+        - "DP" : Dirichlet prior estimator (maximum evidence);
+        - "DPM" : Dirichlet prior mixture estimator.
     unit: str, optional
         the divergence logbase unit:
         - "ln": natural logarithm (default);
@@ -338,9 +334,9 @@ class Divergence( Skeleton_Class ) :
         return default_divergence.switchboard( self.compact(), method=method, which="Jensen-Shannon", unit=unit, **kwargs )
 
     def symmetrized_KL( self, method="naive", unit="ln", **kwargs ):
-        '''Estimate symmetric Kullback-Leibler divergence.
+        '''Estimate symmetrized Kullback-Leibler divergence.
 
-        Symmetrized Kullback-Leibler divergence estimation through a chosen `method`.
+        Symmetric Kullback-Leibler divergence estimation through a chosen `method`.
         The unit (of the logarithm) can be specified with the parameter `unit`.
 
         return numpy.array

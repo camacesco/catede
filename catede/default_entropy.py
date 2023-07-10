@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) April 2023 Francesco Camaglia, LPENS 
+    Copyright (C) June 2023 Francesco Camaglia, LPENS 
 
     Following the architecture of J. Hausser and K. Strimmer : 
     https://strimmerlab.github.io/software/entropy/  
@@ -18,14 +18,14 @@ import warnings
 
 _method_List_ = [
     "naive",
-    "cat", "categorical",
-    "max_evidence",
+    "DC", "categorical",
+    "DP", "max_evidence",
     "NSB", "Nemenmann-Shafee-Bialek",
     "CS", "Chao-Shen", 
     "Je", "Jeffreys",
     "MM", "Miller-Madow", 
     "La", "Laplace", 
-    "Tr", "minimax", "Trybula", 
+    "Tr", "Trybula", "minimax", 
     "Pe", "Perks",
     "SG", "Schurmann-Grassberger", 
 ]
@@ -91,10 +91,10 @@ def switchboard( compExp, method="naive", which="Shannon", unit="default", **kwa
     elif method in ["SG", "Schurmann-Grassberger"] :
         estimate = schurmann_grassberger(compExp, which=which)
 
-    elif method in ["max_evidence"] :
+    elif method in ["DP", "max_evidence"] :
         estimate = dirichlet_multinomial_expected_value(compExp, which=which, **kwargs)   
 
-    elif method in ["categorical"] :
+    elif method in ["DC", "categorical"] :
         estimate = dirichlet_multinomial_expected_value(compExp, param=1, which=which, **kwargs)   
 
     elif method in ["La", "Laplace"] :

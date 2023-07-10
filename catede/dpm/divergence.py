@@ -3,7 +3,7 @@
 
 '''
 Unbiased Dirichlet Mixture Method - Divergence Estimator
-Copyright (C) April 2023 Francesco Camaglia, LPENS 
+Copyright (C) June 2023 Francesco Camaglia, LPENS 
 '''
 
 import itertools
@@ -129,8 +129,7 @@ def dpm_estimator(dpm_wrap, error=False, n_sigma=3, n_bins=None, cpu_count=None,
         #  DKL estimator vs alpha,beta  #
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-        # FIXME : 
-        # parallelization is weak...
+        # FIXME : parallelization can be improved
 
         POOL = multiprocessing.Pool(cpu_count) 
 

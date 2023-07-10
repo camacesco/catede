@@ -3,7 +3,7 @@
 
 '''
     Squared Hellinger Divergence Estimator
-    Copyright (C) April 2023 Francesco Camaglia, LPENS 
+    Copyright (C) June 2023 Francesco Camaglia, LPENS 
 '''
 
 import numpy as np

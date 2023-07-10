@@ -4,7 +4,7 @@
 '''
     Bayesian Calculus
     -----------------
-    Copyright (C) April 2023 Francesco Camaglia, LPENS 
+    Copyright (C) June 2023 Francesco Camaglia, LPENS 
 '''
 
 import warnings

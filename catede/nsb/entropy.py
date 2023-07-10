@@ -3,7 +3,7 @@
 
 '''
     Nemenmann-Shafee-Bialek Method - Entropy Estimator
-    Copyright (C) April 2023 Francesco Camaglia, LPENS 
+    Copyright (C) June 2023 Francesco Camaglia, LPENS 
 
     ref: 
     Nemenman, I., Shafee, F. & Bialek, W. Entropy and Inference, Revisited. 
