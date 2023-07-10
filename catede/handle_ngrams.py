@@ -246,10 +246,10 @@ class ngram_gear:
     def encode( self, sequences ) :
         ''' Encode all ngrams observed in the respective sequences.'''
 
-        word_length = self.num
+        word_lenght = self.num
         
         # WARNING!: this is a bottleneck
-        all_possible_words = list(map( ("").join, product( self.alphabet, repeat=word_length) ) )
+        all_possible_words = list(map( ("").join, product( self.alphabet, repeat=word_lenght) ) )
         word_dict = dict(zip(all_possible_words, np.arange(len(all_possible_words))))
 
         extracted_ngrams = self._extract( sequences )
@@ -333,7 +333,7 @@ def load_file_dict( file_input, header=None, index_col=0, delimiter=",", compres
     if len(Lengths) == 0 :
         raise IOError( "The ngrams file is empty." )
     elif len( set(Lengths) ) > 1 :
-        raise IOError( "The ngrams file contains ngrams with multiple lengths." )
+        raise IOError( "The ngrams file contains ngrams with multiple lenghts." )
     else :
         num = Lengths[0]
     
@@ -350,18 +350,18 @@ def load_file_dict( file_input, header=None, index_col=0, delimiter=",", compres
 ###
 
 
-def decode_ngrams( encoded_word_list, code_dict, word_length ) :
+def decode_ngrams( encoded_word_list, code_dict, word_lenght ) :
     '''Decodes ngrams according to the given code_dict.'''
     # FIXME :
 
-    assert np.max(encoded_word_list) < np.power(len(code_dict),word_length)
-    converter = np.power(len(code_dict), np.arange(word_length))[::-1]
+    assert np.max(encoded_word_list) < np.power(len(code_dict),word_lenght)
+    converter = np.power(len(code_dict), np.arange(word_lenght))[::-1]
     inv_code = {v: k for k, v in code_dict.items()}
 
     # reconstruct the digitizzed ngram matrix
     tmp = np.array(encoded_word_list)
     ngram_mtx_upside_down = []
-    for idx in np.arange(word_length) :
+    for idx in np.arange(word_lenght) :
         div = converter[-idx-1]
         ngram_mtx_upside_down.append( np.floor( tmp / div ).astype(int) )
         tmp = np.mod(tmp, div)
@@ -448,14 +448,14 @@ def cross_entr_operator( x, y ) :
 
 class markov_class() :
     def __init__(
-        self, length,
+        self, lenght,
         markov_matrix=None, n_states=None, uniform=False, seed=None
         ) :
 
         try :
-            self.length = int(length)
+            self.lenght = int(lenght)
         except :
-            raise IOError("length is an integer greater than 1.")
+            raise IOError("lenght is an integer greater than 1.")
 
         if markov_matrix is None :
             if n_states is not None :
@@ -499,7 +499,7 @@ class markov_class() :
     def pmf( self, ) :
         '''The probability mass function of each state.'''
 
-        L = self.length
+        L = self.lenght
         A = self.n_states
         mm = self.markov_matrix.T.ravel()
         ss = self.statState().ravel()
@@ -520,7 +520,7 @@ class markov_class() :
     def exact_shannon( self, ) :
         '''exact Shannon entropy with stationary state as initial.'''
 
-        L = self.length
+        L = self.lenght
         sstate = self.statState( )
         mmatrix = self.markov_matrix
 
@@ -533,7 +533,7 @@ class markov_class() :
     def exact_simpson( self, ) :
         '''exact Simpson index with stationary state as initial.'''
 
-        L = self.length
+        L = self.lenght
         sstate2 = np.power(self.statState( ), 2)
         mmatrix2 = np.power(self.markov_matrix, 2)
 
@@ -562,8 +562,8 @@ def _exact_kullbackleibler( markov_obj1, markov_obj2 ) :
     '''
 
     assert markov_obj1.n_states == markov_obj2.n_states
-    assert markov_obj1.length == markov_obj2.length
-    L = markov_obj1.length
+    assert markov_obj1.lenght == markov_obj2.lenght
+    L = markov_obj1.lenght
 
     if np.all( markov_obj1.markov_matrix == markov_obj2.markov_matrix ) :
         output = 0.
@@ -588,8 +588,8 @@ def _exact_squared_hellinger( markov_obj1, markov_obj2 ) :
     '''
 
     assert markov_obj1.n_states == markov_obj2.n_states
-    assert markov_obj1.length == markov_obj2.length
-    L = markov_obj1.length
+    assert markov_obj1.lenght == markov_obj2.lenght
+    L = markov_obj1.lenght
 
     if np.all( markov_obj1.markov_matrix == markov_obj2.markov_matrix ) :
         output = 0.
