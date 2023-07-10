@@ -11,8 +11,60 @@ import pandas as pd
 from .dirichlet_multinomial import Experiment_Compact, Divergence_Compact
 from . import default_divergence, default_entropy
 
+__entropy_doc__ = '''
+        The unit (of the logarithm) can be specified with the parameter `unit`.
+
+        return numpy.array
+
+        Parameters
+        ----------
+        method: str
+            the name of the estimation method:
+            - "naive" : naive estimator (default);
+            - "MM" : Miller-Madow estimator;
+            - "Pe" : Perks pseudocunt estimator;
+            - "La" : Laplace pseudocount estimator;
+            - "Je" : Jeffreys pseudocount estimator (Krichevsky-Trofimov);
+            - "Tr" : Trybula pseudocount estimator (minimax); 
+            - "SG" : Schurmann-Grassberger estimator;
+            - "CS" : Chao-Shen estimator (coverage-adjusted); 
+            - "DC" : Dirichlet categorical estimator;
+            - "DP" : Dirichlet prior estimator (maximum evidence);
+            - "NSB" : "Nemenmann-Shafee-Bialek".
+
+        unit: str, optional
+            the divergence logbase unit:
+            - "ln": natural logarithm (default);
+            - "log2": base 2 logarihtm;
+            - "log10":base 10 logarithm.
+'''
+        
+__diverg_doc__ = '''
+        The unit (of the logarithm) can be specified with the parameter `unit`.
+
+        return numpy.array
+
+        Parameters
+        ----------
+        method: str
+            the name of the estimation method:
+            - "naive" : naive estimator (default);
+            - "La" : Laplace pseudocount estimator;
+            - "Je" : Jeffreys pseudocount estimator (Krichevsky-Trofimov);
+            - "Tr" : Trybula pseudocount estimator (minimax); 
+            - "ZG" : Zhang-Grabchak estimator;
+            - "DC" : Dirichlet categorical estimator;
+            - "DP" : Dirichlet prior estimator (maximum evidence);
+            - "DPM" : Dirichlet prior mixture estimator.
+        unit: str, optional
+            the divergence logbase unit:
+            - "ln": natural logarithm (default);
+            - "log2": base 2 logarihtm;
+            - "log10":base 10 logarithm.
+'''
+
 class Skeleton_Class :
-    ''' Auxiliary class for Experiment and Divergence.'''
+    '''Auxiliary class for Experiment and Divergence.'''
 
     def update_categories( self, categories ):
         '''Change the number of categories.
@@ -21,8 +73,8 @@ class Skeleton_Class :
         ----------        
         categories : scalar
                 The new number of categories of the system (int or float). 
-                If the value is lower than the observed number of categories, 
-                the observed number is used instead.'''
+                If the value is lower than the observed number of categories, the observed number is used instead.
+        '''
 
         obs_n_categ = np.max(self.obs_n_categ)
         if categories is None:
@@ -39,6 +91,7 @@ class Skeleton_Class :
                 if categories < obs_n_categ :
                     warnings.warn("The parameter `categories` is set equal to the observed number of categories.")
         self._fix_zero_counts()
+        pass
         
     def show( self ):
         '''Print a short summary.'''
@@ -55,25 +108,24 @@ class Skeleton_Class :
         
         print("Multiplicities:")
         print(self.counts_hist)
+        pass
     
 ######################
 #  EXPERIMENT CLASS  #
 ######################
 
 class Experiment( Skeleton_Class ) :
-    '''A class for entropy estimation from data distribution.'''
-
-    __doc__ += Skeleton_Class.__doc__
+    '''The basic class for estimating entropy of a distribution given a sample.'''
     
     def __init__(self, data_hist, categories=2, ishist=True):
         '''
         Parameters
         ----------    
-        data_hist : Union[dict, pd.DataFrame, pd.Series, list, np.array] 
+        data_hist : Union[dict, pd.Series, pd.DataFrame, list, np.array] 
             The number of observations for each category or a raw list of observations (deprecated).
         categories : scalar, optional
             The a priori total number of categories.
-        ishist : bool
+        ishist : bool, optional
             When `data_hist` is a list of integers, it specifies wheter it is a histogram (True, default) 
             or a raw list of observations (False, deprecated).
         '''
@@ -102,10 +154,10 @@ class Experiment( Skeleton_Class ) :
             raise TypeError("The parameter `data` has unsopported type.")
 
         # check int counts 
+        # FIXME : these try/except for option loading can be messy
         try :
             data_hist = data_hist.astype(int)
         except ValueError :
-            # WARNING! : this try/except doesn't looks nice
             raise ValueError("Unrecognized count value in `data`.")    
 
         # check categories
@@ -130,9 +182,10 @@ class Experiment( Skeleton_Class ) :
         #  Load categories  #
         categories = np.max([categories, self.obs_n_categ])
         self.update_categories( categories )
+        pass
 
     def _fix_zero_counts( self ) :
-        ''' (internal) add/remove 0 to counts_hist.'''
+        ''' (internal) Add/remove 0 values to counts_hist.'''
         if self.usr_n_categ > self.obs_n_categ :
             self.counts_hist.at[0] = self.usr_n_categ - self.obs_n_categ
             self.counts_hist = self.counts_hist.sort_index(ascending=True) 
@@ -141,54 +194,14 @@ class Experiment( Skeleton_Class ) :
                 self.counts_hist.drop(index=[0], inplace=True)
         else :
             raise ValueError('Interal inconsistecy between n. of categories.')
-
-        '''
-        Entropy methods.
-
-        Parameters
-        ----------
-        method: str
-            the name of the estimation method:
-            - "naive" : naive estimator (default);
-            - "naive" : naive estimator (default);
-            - "MM" : Miller-Madow estimator;
-            - "Pe", Perks pseudocunt,
-            - "La" : Laplace pseudocount estimator;
-            - "Je" : Jeffreys pseudocount estimator (Krichevsky-Trofimov);
-            - "Tr" : Trybula pseudocount estimator (minimax); 
-            - "SG" : Schurmann-Grassberger estimator;
-            - "CS" : Chao-Shen estimator (coverage-adjusted); 
-            - "DC" : Dirichlet categorical estimator;
-            - "DP" : Dirichlet prior estimator (maximum evidence);
-            - "NSB", "Nemenmann-Shafee-Bialek".
-
-        unit: str, optional
-            the divergence logbase unit:
-            - "ln": natural logarithm (default);
-            - "log2": base 2 logarihtm;
-            - "log10":base 10 logarithm.
-        '''
+        pass
 
     def shannon(self, method="naive", unit="ln", **kwargs):
-        '''Estimate Shannon entropy.
-
-        Shannon entropy estimation through a chosen `method`.
-        The unit (of the logarithm) can be specified with the parameter `unit`.
-
-        return numpy.array
-        '''
-        
+        '''Estimate Shannon entropy with a chosen `method`.'''
         return default_entropy.switchboard( self.compact(), which="Shannon", method=method, unit=unit, **kwargs )
     
     def simpson( self, method="naive", **kwargs ):
-        '''Estimate Simpson index.
-
-        Simpson index estimation through a chosen `method`.
-        The unit (of the logarithm) can be specified with the parameter `unit`.
-
-        return numpy.array
-        '''
-        
+        '''Estimate Simpson index with a chosen `method`.'''
         return default_entropy.switchboard( self.compact(), which="Simpson", method=method, **kwargs )
     
     def compact( self ) :
@@ -198,16 +211,18 @@ class Experiment( Skeleton_Class ) :
     def save_compact( self, filename ) :
         '''It saves the compact features of Experiment to `filename`.'''
         self.compact( )._save( filename )
+        pass
 
+# fix docstring
+Experiment.shannon.__doc__ += __entropy_doc__
+Experiment.simpson.__doc__ += __entropy_doc__
 
 ######################
 #  DIVERGENCE CLASS  #
 ######################
 
 class Divergence( Skeleton_Class ) :
-    '''The basic class for estimating divergence between two dataset distributions.'''
-
-    __doc__ += Skeleton_Class.__doc__
+    '''The basic class for estimating divergence between two distributions given two samples.'''
 
     def __init__( self, my_exp_1, my_exp_2, categories=2, ishist=True ) :
         '''
@@ -259,7 +274,24 @@ class Divergence( Skeleton_Class ) :
         self.exp_2 = Experiment(my_exp_2.data_hist, categories=self.usr_n_categ)
         counts_2 = tmp[["freq", "Exp-2"]].set_index("Exp-2", drop=True)
         self.exp_2.counts_hist = counts_2["freq"]
+        pass
 
+    def kullback_leibler( self, method="naive", unit="ln", **kwargs ):
+        '''Estimate the Kullback-Leibler divergence with a chosen `method`.'''
+        return default_divergence.switchboard( self.compact(), which="Kullback-Leibler", method=method, unit=unit, **kwargs )
+
+    def jensen_shannon( self, method="naive", unit="ln", **kwargs ):
+        '''Estimate the Jensen-Shannon divergence with a chosen `method`.'''
+        return default_divergence.switchboard( self.compact(), method=method, which="Jensen-Shannon", unit=unit, **kwargs )
+
+    def symmetrized_KL( self, method="naive", unit="ln", **kwargs ):
+        '''Estimate the symmetrized Kullback-Leibler divergence with a chosen `method`.'''
+        return default_divergence.switchboard( self.compact(), method=method, which="symmetrized-KL", unit=unit, **kwargs )
+
+    def squared_hellinger( self, method="naive", **kwargs ):
+        '''Estimate the (squared) Hellinger divergence with a chosen `method`.'''
+        return default_divergence.switchboard( self.compact(), method=method, which="squared-Hellinger", **kwargs )
+    
     def compact( self ) :
         '''It provides aliases for computations.'''
         return Divergence_Compact( self )
@@ -273,10 +305,12 @@ class Divergence( Skeleton_Class ) :
             )
         outFrame = outFrame.append( add_ons )
         outFrame.to_csv( filename, sep=' ', mode='w', header=True, index=True, compression=compression )
-        
+        pass
+
     def save_compact( self, filename ) :
         '''It saves the compact version of Divergence to `filename`.'''
         self.compact( )._save( filename )
+        pass
 
     def _fix_zero_counts( self ) :
         ''' (internal) add/remove (0,0) to counts_hist.'''
@@ -288,74 +322,13 @@ class Divergence( Skeleton_Class ) :
                 self.counts_hist.drop(index=(0,0), inplace=True)
         else :
             raise ValueError('Interal inconsistecy between n. of categories.')
-        
-    '''
-    Divergence methods.
+        pass
 
-    Parameters
-    ----------
-    method: str
-        the name of the estimation method:
-        - "naive" : naive estimator (default);
-        - "La" : Laplace pseudocount estimator;
-        - "Je" : Jeffreys pseudocount estimator (Krichevsky-Trofimov);
-        - "Tr" : Trybula pseudocount estimator (minimax); 
-        - "Zh" : Zhang-Grabchak estimator;
-        - "DC" : Dirichlet categorical estimator;
-        - "DP" : Dirichlet prior estimator (maximum evidence);
-        - "DPM" : Dirichlet prior mixture estimator.
-    unit: str, optional
-        the divergence logbase unit:
-        - "ln": natural logarithm (default);
-        - "log2": base 2 logarihtm;
-        - "log10":base 10 logarithm.
-    '''
-
-    def kullback_leibler( self, method="naive", unit="ln", **kwargs ):
-        '''Estimate Kullback-Leibler divergence.
-
-        Kullback-Leibler divergence estimation through a chosen `method`.
-        The unit (of the logarithm) can be specified with the parameter `unit`.
-
-        return numpy.array
-        '''
-        
-        return default_divergence.switchboard( self.compact(), which="Kullback-Leibler", method=method, unit=unit, **kwargs )
-
-    def jensen_shannon( self, method="naive", unit="ln", **kwargs ):
-        '''Estimate Jensen-Shannon divergence.
-
-        Jensen-Shannon divergence estimation through a chosen `method`.
-        The unit (of the logarithm) can be specified with the parameter `unit`.
-
-        return numpy.array
-        '''
-        
-        return default_divergence.switchboard( self.compact(), method=method, which="Jensen-Shannon", unit=unit, **kwargs )
-
-    def symmetrized_KL( self, method="naive", unit="ln", **kwargs ):
-        '''Estimate symmetrized Kullback-Leibler divergence.
-
-        Symmetric Kullback-Leibler divergence estimation through a chosen `method`.
-        The unit (of the logarithm) can be specified with the parameter `unit`.
-
-        return numpy.array
-        '''
-        
-        return default_divergence.switchboard( self.compact(), method=method, which="symmetrized-KL", unit=unit, **kwargs )
-
-
-    def squared_hellinger( self, method="naive", **kwargs ):
-        '''Estimate squared Hellinger divergence.
-
-        Hellinger divergence estimation through a chosen `method`.
-
-        return numpy.array
-        '''
-        
-        return default_divergence.switchboard( self.compact(), method=method, which="squared-Hellinger", **kwargs )
-
-
+# fix docstring
+Divergence.kullback_leibler.__doc__ += __diverg_doc__
+Divergence.jensen_shannon.__doc__ += __diverg_doc__
+Divergence.symmetrized_KL.__doc__ += __diverg_doc__
+Divergence.squared_hellinger.__doc__ += __diverg_doc__
 
 def load_diver( filename ) :
     '''  Load the Divergence object stored in `filename`. '''
