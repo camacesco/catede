@@ -1,12 +1,11 @@
 Metadata-Version: 2.1
 Name: catede
-Version: 0.0.22
+Version: 0.0.23
 Summary: Python package for entropy and divergence estimation.
 Home-page: https://github.com/camacesco/catede
 Author: Francesco Camaglia
 Author-email: francesco.camaglia@phys.ens.fr
 License: GNU GPLv3
-Platform: UNKNOWN
 Requires-Python: >=3.5
 Description-Content-Type: text/markdown
 License-File: LICENSE
@@ -26,5 +25,3 @@ The package _catede_ can be installed by using the setup.py script :
  ```python setup.py install```.
 
  ## References
-
-

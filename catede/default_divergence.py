@@ -29,7 +29,7 @@ _method_List_ = [
     "Pe", "Perks",
 ]
 
-_which_List_ = ["squared-Hellinger", "Jensen-Shannon", "Kullback-Leibler", "symmetrized-KL"]
+_which_List_ = ["squared-Hellinger", "Jensen-Shannon", "Kullback-Leibler", "symmetric-KL"]
 
 #############
 #  ALIASES  #
@@ -63,7 +63,7 @@ def switchboard(cpct_div, method="naive", which="Kullback-Leibler", unit="defaul
         raise IOError("Unkown divergence. Please choose `which` amongst :", _which_List_ )
     
     # loading units
-    if which in ["Jensen-Shannon", "Kullback-Leibler", "symmetrized-KL"] :
+    if which in ["Jensen-Shannon", "Kullback-Leibler", "symmetric-KL"] :
         if unit not in _unit_Dict_.keys( ) :
             warnings.warn( "Please choose `unit` amongst :", _unit_Dict_.keys( ), ". Falling back to default." )
         unit_conv = _unit_Dict_.get( unit, _unit_Dict_["default"] )
@@ -87,6 +87,13 @@ def switchboard(cpct_div, method="naive", which="Kullback-Leibler", unit="defaul
     elif method in ["Zh", "Zhang-Grabchak"] :
         if which in ["Kullback-Leibler", "symmetrized-KL"] :
             divergence_estimate = zhang(cpct_div, which=which)
+            divergence_estimate = _DH2_dpm_estimator(comp_div, **kwargs)
+        elif which == "symmetric-KL" :
+            divergence_estimate = _symmDKL_dpm_estimator(comp_div, **kwargs)
+    
+    elif method in ["Zh", "Zhang-Grabchak"] :
+        if which in ["Kullback-Leibler", "symmetric-KL"] :
+            divergence_estimate = zhang(comp_div, which=which)
         else :
             raise IOError(f"Unknown method `{method}` for {which}.")
         
@@ -145,7 +152,7 @@ def naive(cpct_div, which="Kullback-Leibler") :
 
     elif which == "Kullback-Leibler" :                       
         output = ff.dot(KullbackLeibler_oper(hh_1, hh_2))
-
+        
     elif which == "symmetrized-KL" :                       
         output = ff.dot(symmetrized_KL_oper(hh_1, hh_2))
 
@@ -181,7 +188,7 @@ def zhang( cpct_div, which="Kullback-Leibler", CPU_Count=None) :
     if which == "Kullback-Leibler" : 
         output = ff.dot(nn_1 * (D_diGmm(N_2+1, nn_2+1) - D_diGmm(N_1, nn_1))) / N_1
 
-    elif which == "symmetrized-KL" :  
+    elif which == "symmetric-KL" :  
         output = 0.5 * ff.dot(nn_1 * (D_diGmm(N_2+1, nn_2+1) - D_diGmm(N_1, nn_1))) / N_1
         mask = cpct_div.nn_2 > 0
         nn_1, nn_2, ff = cpct_div.nn_1[mask], cpct_div.nn_2[mask], cpct_div.ff[mask]
@@ -228,7 +235,7 @@ def dirichlet_multinomial_pseudo_count( cpct_div, params=None, which="Kullback-L
 
     elif which == "Kullback-Leibler" :                               
         output = ff.dot(KullbackLeibler_oper(hh_1_a, hh_2_b))
-
+        
     elif which == "symmetrized-KL" :                       
         output = ff.dot(symmetrized_KL_oper(hh_1_a, hh_2_b))
 
@@ -271,7 +278,7 @@ def dirichlet_multinomial_expected_value(cpct_div, params=None, which="Kullback-
         if error == True :
             tmp = cpct_div.squared_kullback_leibler(a, b)
             output = [output, np.sqrt(tmp - output**2)]
-
+            
     elif which == "symmetrized-KL" :  
         cpct_div_rev = deepcopy(cpct_div)         
         output = 0.5 * ( cpct_div.kullback_leibler(a, b) + cpct_div_rev.kullback_leibler(b, a))

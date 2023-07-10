@@ -342,7 +342,7 @@ class Divergence( Skeleton_Class ) :
         return numpy.array
         '''
         
-        return default_divergence.switchboard( self.compact(), method=method, which="symmetrized-KL", unit=unit, **kwargs )
+        return default_divergence.switchboard( self.compact(), method=method, which="symmetric-KL", unit=unit, **kwargs )
 
 
     def squared_hellinger( self, method="naive", **kwargs ):
