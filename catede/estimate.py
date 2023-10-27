@@ -210,7 +210,7 @@ class Experiment( Skeleton_Class ) :
 
     def save_compact( self, filename ) :
         '''It saves the compact features of Experiment to `filename`.'''
-        self.compact( )._save( filename )
+        self.compact( ).save( filename )
         pass
 
 # fix docstring
@@ -309,7 +309,7 @@ class Divergence( Skeleton_Class ) :
 
     def save_compact( self, filename ) :
         '''It saves the compact version of Divergence to `filename`.'''
-        self.compact( )._save( filename )
+        self.compact( ).save( filename )
         pass
 
     def _fix_zero_counts( self ) :
