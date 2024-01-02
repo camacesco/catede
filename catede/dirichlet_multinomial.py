@@ -3,14 +3,13 @@
 
 '''
     Multivariate Beta Function Calculus
-    Copyright (C) July 2023 Francesco Camaglia, LPENS 
+    Copyright (C) January 2024 Francesco Camaglia, LPENS 
 '''
 import warnings
 import numpy as np
 import pandas as pd
 from numpy import outer
 from scipy.special import loggamma, polygamma
-
 
 # ########## #
 #  NOTATION  #

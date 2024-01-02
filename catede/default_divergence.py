@@ -3,7 +3,7 @@
 
 '''
     *** Default Divergence ***
-    Copyright (C) June 2023 Francesco Camaglia, LPENS 
+    Copyright (C) January 2024 Francesco Camaglia, LPENS 
 '''
 
 import warnings

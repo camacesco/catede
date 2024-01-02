@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 '''
-    symmetrized Kullback-Leibler Divergence Estimator
-    Copyright (C) June 2023 Francesco Camaglia, LPENS 
+    symmetrized Kullback-Leibler Divergence DP(M) Estimator
+    Copyright (C) January 2024 Francesco Camaglia, LPENS 
 '''
 
 import numpy as np

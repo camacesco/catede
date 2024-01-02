@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Squared Hellinger Divergence Estimator
-    Copyright (C) June 2023 Francesco Camaglia, LPENS 
+    Squared Hellinger Divergence DP(M) Estimator
+    Copyright (C) Januart 2024 Francesco Camaglia, LPENS 
 '''
 
 import numpy as np

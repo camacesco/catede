@@ -8,9 +8,9 @@ In particular it provides the code for the Dirichlet prior mixture estimators fo
 
 ## Installation
 
-The package _catede_ can be installed by using the setup.py script :
+The package _catede_ can be installed from github by running from terminal the following command line :
 
- ```python setup.py install```.
+ ```pip install git+https://github.com/statbiophys/catede.git```.
 
 ## References
 
