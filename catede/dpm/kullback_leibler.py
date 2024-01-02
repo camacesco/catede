@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Kullback-Leibler Divergence Estimator
-    Copyright (C) June 2023 Francesco Camaglia, LPENS 
+    Kullback-Leibler Divergence DP(M) Estimator
+    Copyright (C) January 2023 Francesco Camaglia, LPENS 
 '''
 
 import numpy as np

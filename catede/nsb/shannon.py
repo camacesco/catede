@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Shannon Entropy Estimator
-    Copyright (C) June 2023 Francesco Camaglia, LPENS 
+    Shannon Entropy NSB Estimator
+    Copyright (C) January 2024 Francesco Camaglia, LPENS 
 '''
 
 import numpy as np

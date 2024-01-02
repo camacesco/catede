@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 '''
-Unbiased Dirichlet Mixture Method - Divergence Estimator
-Copyright (C) June 2023 Francesco Camaglia, LPENS 
+    Unbiased Dirichlet Mixture Method - Divergence Estimator
+    Copyright (C) January 2024 Francesco Camaglia, LPENS 
 '''
 
 import itertools

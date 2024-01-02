@@ -4,7 +4,7 @@
 '''
     Bayesian Calculus
     -----------------
-    Copyright (C) June 2023 Francesco Camaglia, LPENS 
+    Copyright (C) January 2024 Francesco Camaglia, LPENS 
 '''
 
 import warnings
@@ -13,8 +13,8 @@ from scipy import optimize
 from .dirichlet_multinomial import *
 
 MAX_ITER = 1000
-TOL = 1.0e-16
-BOUND_DIR = (1.0e-5, 1.0e3)
+TOL = 1.0e-14
+BOUND_DIR = (1.0e-6, 1.0e4)
 METHOD='L-BFGS-B'
 INIT_GUESS = 1.0
 CUTOFFRATIO = 5 # FIXME this can be an option

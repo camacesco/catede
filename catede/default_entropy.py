@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) June 2023 Francesco Camaglia, LPENS 
+    Copyright (C) January 2024 Francesco Camaglia, LPENS 
 
     Following the architecture of J. Hausser and K. Strimmer : 
     https://strimmerlab.github.io/software/entropy/  

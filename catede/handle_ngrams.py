@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Copyright (C) June 2023 Francesco Camaglia, LPENS 
+    This module provides functionality for handling n-grams and performing n-gram experiments.
+
+    Copyright (C) January 2024 Francesco Camaglia, LPENS 
 '''
 
 import warnings
@@ -22,7 +24,7 @@ from .estimate import Experiment
 
 def reduceList( ListOfLists ):
     '''
-    To transform a list of sub-lists in a single list containing the elements of the non-empty sub-lists.
+    To transform a list of sub-lists into a single list containing the elements of the non-empty sub-lists.
     e.g. 
     ----
     ListOfLists = [ [ 2, 4 ], [ ], [ "A", "G" ] ]
@@ -46,8 +48,8 @@ def reduceList( ListOfLists ):
 # alphabets dictionary
 _Alphabet_ = { 
     'NT': (['A', 'C', 'G', 'T'], "nucleotide"),
-    'AA': (['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y'], "amminoacid"),
-    'AA_Stop': (['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y', ''], "amminoacid + stopping codon"),
+    'AA': (['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y'], "amino acid"),
+    'AA_Stop': (['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y', ''], "amino acid + stopping codon"),
     'ASCII_lower': (list(string.ascii_lowercase), "ASCII lowercase"),
     'ASCII_upper': (list(string.ascii_uppercase), "ASCII uppercase"),
     }
@@ -57,51 +59,65 @@ _Alphabet_ = {
 ############################
 
 class ngram_gear:
-    
+    '''
+    Class for handling n-grams and performing n-gram experiments.
+
+    Attributes
+    ----------
+    num : int
+        The number of letters which form an n-gram.
+    alph : str
+        The alphabet where the elements belong to.
+    categories : int
+        The number of possible n-grams given the alphabet and n.
+    data_hist : pandas Series
+        The dictionary with n-gram counts.
+    experiment : Experiment
+        The n-gram experiment object.
+
+    Methods
+    -------
+    assign_hist(data_hist)
+        Assigns the attribute `data_hist` which must be a pandas Series with n-grams for index and counts as values.
+    clean_hist()
+        Cleans the attribute `data_hist`.
+    assign_features(skip=None, beg=None, end=None)
+        Assigns the skip, beg, and end features.
+    encode(sequences)
+        Encodes all n-grams observed in the respective sequences.
+    hist_update(sequences, file_output=None)
+        Updates the data histogram by computing n-grams on each entry of the list "sequences".
+    save_file_dict(file_output)
+        Saves the n-grams dictionary to a gzipped file.
+    '''
+
     def __init__( self, num=None, alph=None, ngrams_file_input=None, skip=None, beg=None, end=None ):
- 
         '''
+        Initializes the ngram_gear object.
+
         Parameters
         ----------
-                
-        num: scalar
-                the number of letters which form a ngram. It must be an integer greater than 0.
-                Ignored if <ngrams_file_input> is chosen.        
-                
-        alph: str
-                the alphabet where the elements belong to. Ignored if <ngrams_file_input> is chosen. 
-                The implemented options are:
-                - "AA" : amino acid alphabet (20 letters);
-                - "AA_Stop" : amino acid alphabet with stop codon "*" (21 letters);
-                - "NT" : nucleotides (4 letters);
-                - "ASCII_lower" : lower case ASCII alphabet;
-                - "ASCII_upper" : upper case ASCII alphabet;                
-                
-        ngrams_file_input: path/to/file, option
-                load the dictionary with counts has saved in "path/to/file.csv".
-
-        skip: scalar
-                the number of letters to skip after each ngram before considering the next one.
-                If skip is set to <num>-1, ngrams are considered one after the other (from the left).
-                Default is 0. 
-        beg: scalar
-                constant number of letters to skip at the beginning of each sequence. Default is 0. 
-                
-        end: scalar
-                constant number of letters to skip at the end of each sequence. Default is 0. 
-                       
-        Attributes
-        ----------
-        num :
-        alph :
-        categories :
-        data_hist :
-        experiment :
+        num : int, optional
+            The number of letters which form an n-gram. It must be an integer greater than 0. Ignored if `ngrams_file_input` is chosen.
+        alph : str, optional
+            The alphabet where the elements belong to. Ignored if `ngrams_file_input` is chosen.
+            The implemented options are:
+            - "AA" : amino acid alphabet (20 letters);
+            - "AA_Stop" : amino acid alphabet with stop codon "*" (21 letters);
+            - "NT" : nucleotides (4 letters);
+            - "ASCII_lower" : lowercase ASCII alphabet;
+            - "ASCII_upper" : uppercase ASCII alphabet;
+        ngrams_file_input : str, optional
+            The path to the file containing the n-grams dictionary with counts.
+        skip : int, optional
+            The number of letters to skip after each n-gram before considering the next one.
+            If skip is set to `num`-1, n-grams are considered one after the other (from the left).
+            Default is 0.
+        beg : int, optional
+            Constant number of letters to skip at the beginning of each sequence. Default is 0.
+        end : int, optional
+            Constant number of letters to skip at the end of each sequence. Default is 0.
         '''
-        
-        # >>>>>>>>>>>>>>
-        #  INPUT LOAD  #
-        # >>>>>>>>>>>>>>
 
         if ngrams_file_input is not None: 
             #  load parameters from file 
@@ -112,7 +128,7 @@ class ngram_gear:
             
             #  num  #
             if num is None :    
-                raise IOError('num must specified if ngrams_file_input is not.')
+                raise IOError('num must be specified if ngrams_file_input is not.')
             elif type( num ) != int : 
                 raise TypeError('num must be an integer.')
             elif num < 1 : 
@@ -122,7 +138,7 @@ class ngram_gear:
             
             #  alph  #
             if alph is None :    
-                raise IOError('`alph` must specified if `ngrams_file_input` is not.')
+                raise IOError('`alph` must be specified if `ngrams_file_input` is not.')
             elif type( alph ) != str : 
                 try :
                     self.alphabet = list(alph)
@@ -140,47 +156,42 @@ class ngram_gear:
 
         self.categories = np.power( len(self.alphabet), self.num )             
         self.experiment = Experiment( self.data_hist, categories=self.categories )
-
-    '''
-    Methods
-    -------
-    '''
-    
-    # >>>>>>>>>>>>>>>
-    #  ASSIGN HIST  #
-    # >>>>>>>>>>>>>>>
     
     def assign_hist( self, data_hist ) :
         '''
-        Assign the attribute <data_hist> which must be a pandas Serie
-        with ngram for index and count in values. FIXME
+        Assigns the attribute `data_hist` which must be a pandas Series with n-grams for index and counts as values.
+        No check is performed on the alphabet of the n-grams provided.
+
+        Parameters
+        ----------
+        data_hist : pandas Series
+            The dictionary with n-gram counts.
         '''
-        
-        # WARNING!: missing a check for the user data_hist alphabet
         
         self.data_hist = data_hist          
         self.experiment = Experiment( data_hist, categories=self.categories )
-    ###
-    
-    # >>>>>>>>>>>>>>>
-    #  CLEAN HIST  #
-    # >>>>>>>>>>>>>>>
 
     def clean_hist( self ) :
-        ''' Clean the attribute <data_hist>. ''' 
+        ''' 
+        Cleans the attribute `data_hist`.
+        ''' 
         self.assign_hist( pd.Series(dtype=object) )
-    ###
-    
-    # >>>>>>>>>>>>>>>>>>>
-    #  ASSIGN FEATURES  #
-    # >>>>>>>>>>>>>>>>>>>
 
     def assign_features( self, skip=None, beg=None, end=None ):     
-        ''' assign skip, beg, end.'''
+        ''' 
+        Assigns the skip, beg, and end features.
 
-        # >>>>>>>>>>>>>>
-        #  INPUT LOAD  #
-        # >>>>>>>>>>>>>>
+        Parameters
+        ----------
+        skip : int, optional
+            The number of letters to skip after each n-gram before considering the next one.
+            If skip is set to `num`-1, n-grams are considered one after the other (from the left).
+            Default is 0.
+        beg : int, optional
+            Constant number of letters to skip at the beginning of each sequence. Default is 0.
+        end : int, optional
+            Constant number of letters to skip at the end of each sequence. Default is 0.
+        '''
         
         #  skip  #
         if skip is None : skip = 0 # Default
@@ -199,10 +210,6 @@ class ngram_gear:
         elif type( end ) != int : raise IOError('"end" must be an integer.')
         elif end < 0 : raise IOError('"end" must be greater or equal to 0.')
         else :  pass
-                
-        # >>>>>>>>>>>>>
-        #  EXECUTION  #
-        # >>>>>>>>>>>>> 
 
         self.beg = beg     
         self.end = end
@@ -210,23 +217,19 @@ class ngram_gear:
 
     def _inSequence( self, thisSeq ):
         '''
-        It returns the list of <num>-grams contained in thisSeq[beg, len(thisSeq)-end].
-        Distance between grams is set by the <skip> parameter.
-        It returns an empty list if no ngram can be extracted.
+        Returns the list of `num`-grams contained in `thisSeq[beg, len(thisSeq)-end]`.
+        Distance between grams is set by the `skip` parameter.
+        It returns an empty list if no n-gram can be extracted.
         
-        e.g.
-        ----    
-            thisSeq :  A B C D E F G H
-            indeces :  0 1 2 3 4 5 6 7
+        Parameters
+        ----------
+        thisSeq : str
+            The input sequence.
 
-            num=3, skip=1, beg=1, end=2
-            returns: [ "BCD", "DEF" ]
-
-            num=4, skip=0, beg=3, end=1
-            returns: [ "DEFG" ]
-
-            num=4, skip=0, beg=3, end=2
-            returns: [ ]
+        Returns
+        -------
+        list
+            The list of `num`-grams extracted from the sequence.
         '''
 
         first_idx = self.beg
@@ -238,38 +241,55 @@ class ngram_gear:
         return results
 
     def _extract( self, sequences ):
-        '''UPDATE DICTIONARY from SEQUENCES'''
+        '''
+        Extracts n-grams from the given sequences.
 
-        results = list(map(lambda x : self._inSequence( x ), sequences ) )
-        return results
+        Parameters
+        ----------
+        sequences : list
+            The list of sequences from which n-grams are extracted.
+
+        Returns
+        -------
+        list
+            The list of extracted n-grams.
+        '''
+
+        return list(map(lambda x : self._inSequence( x ), sequences ) )
 
     def encode( self, sequences ) :
-        ''' Encode all ngrams observed in the respective sequences.'''
+        '''
+        Encodes all n-grams observed in the respective sequences.
+
+        Parameters
+        ----------
+        sequences : list
+            The list of sequences.
+
+        Returns
+        -------
+        list
+            The encoded n-grams.
+        '''
 
         word_lenght = self.num
         
-        # WARNING!: this is a bottleneck
         all_possible_words = list(map( ("").join, product( self.alphabet, repeat=word_lenght) ) )
         word_dict = dict(zip(all_possible_words, np.arange(len(all_possible_words))))
 
         extracted_ngrams = self._extract( sequences )
-        results = list( map( lambda Words : [word_dict.get(w, -1) for w in Words], extracted_ngrams ) )
-
-        return results
-        
+        return list( map( lambda Words : [word_dict.get(w, -1) for w in Words], extracted_ngrams ) )        
 
     def hist_update( self, sequences, file_output=None ):
         '''
-        It updates data hist computing ngrams on each entry of the list "sequences".
-        Be careful : there is no control on sequences 
+        Updates the data histogram by computing n-grams on each entry of the list "sequences".
 
         Parameters
         ----------
-        sequences: list
-                the list of sequences from which ngrams are extracted.
-               
-        file_output: path/to/file.csv.gz, optional
-                the path/to/file.csv.gz where to save the output (otherways no file is produced). 
+        sequences : list
+            The list of sequences from which n-grams are extracted.
+        file_output : str, optional
+            The path to the output file where the updated n-grams dictionary will be saved. If not provided, no file is produced.
         '''
 
         results = self._extract( sequences )
@@ -282,23 +302,22 @@ class ngram_gear:
             else :
                 self.data_hist = update_hist                          
         else : 
-            warnings.warn("No ngrams returned from the sequences.")  
+            warnings.warn("No n-grams returned from the sequences.")  
             
         self.experiment = Experiment( self.data_hist, categories=self.categories )
 
         #  SAVING FILEOUT 
         if file_output : 
             self.save_file_dict( file_output )
-    
-    ###
-    
-    # >>>>>>>>>>>>>>>>>>>>>>>>
-    #  SAVE FILE DICTIONARY  #
-    # >>>>>>>>>>>>>>>>>>>>>>>>
 
     def save_file_dict( self, file_output ) :
         '''
-        Save n-grams dictionary to a gzipped file.
+        Saves the n-grams dictionary to a gzipped file.
+
+        Parameters
+        ----------
+        file_output : str
+            The path to the output file.
         '''
 
         if type( file_output ) is str : 
@@ -310,10 +329,6 @@ class ngram_gear:
             raise IOError( 'Unrecognized filename : ' + file_output )
 
         self.data_hist.to_csv( file_output, header=False, index=True, sep=",", compression="gzip" )        
-    ###
-    
-###
-
 
 ##########################
 #  LOAD FILE DICTIONARY  #
@@ -321,7 +336,25 @@ class ngram_gear:
 
 def load_file_dict( file_input, header=None, index_col=0, delimiter=",", compression="infer" ) :
     '''
-    To open the ngrams dictionary <file_input>.
+    Opens the n-grams dictionary from the given file.
+
+    Parameters
+    ----------
+    file_input : str
+        The path to the input file.
+    header : int or None, optional
+        The row number(s) to use as the column names. Default is None.
+    index_col : int or str or None, optional
+        The column(s) to use as the row labels of the DataFrame. Default is 0.
+    delimiter : str, optional
+        The delimiter used in the file. Default is ",".
+    compression : str or None, optional
+        For on-the-fly decompression of on-disk data. Default is "infer".
+
+    Returns
+    -------
+    pandas Series
+        The loaded n-grams dictionary.
     '''
     
     # load dictionary
@@ -329,7 +362,7 @@ def load_file_dict( file_input, header=None, index_col=0, delimiter=",", compres
                      compression=compression, sep=delimiter )
     
     # CHECK num :
-    Lengths = list( map( len, df.index.astype(str) ) ) 
+        Lengths = list( map( len, df.index.astype(str) ) ) 
     if len(Lengths) == 0 :
         raise IOError( "The ngrams file is empty." )
     elif len( set(Lengths) ) > 1 :
@@ -347,43 +380,60 @@ def load_file_dict( file_input, header=None, index_col=0, delimiter=",", compres
         raise IOError( "The ngrams file alphabet is not available." )
     
     return num, alph, df
-###
 
+def decode_ngrams(encoded_word_list, code_dict, word_length):
+    '''
+    Decodes ngrams according to the given code_dict.
 
-def decode_ngrams( encoded_word_list, code_dict, word_lenght ) :
-    '''Decodes ngrams according to the given code_dict.'''
-    # FIXME :
+    Parameters
+    ----------
+        encoded_word_list (list): List of encoded ngrams.
+        code_dict (dict): Dictionary mapping codes to corresponding characters.
+        word_length (int): Length of each ngram.
 
-    assert np.max(encoded_word_list) < np.power(len(code_dict),word_lenght)
-    converter = np.power(len(code_dict), np.arange(word_lenght))[::-1]
+    Returns
+    -------
+        list: List of decoded ngrams.
+    '''
+
+    assert np.max(encoded_word_list) < np.power(len(code_dict), word_length)
+    converter = np.power(len(code_dict), np.arange(word_length))[::-1]
     inv_code = {v: k for k, v in code_dict.items()}
 
-    # reconstruct the digitizzed ngram matrix
+    # Reconstruct the digitized ngram matrix
     tmp = np.array(encoded_word_list)
     ngram_mtx_upside_down = []
-    for idx in np.arange(word_lenght) :
+    for idx in np.arange(word_length):
         div = converter[-idx-1]
-        ngram_mtx_upside_down.append( np.floor( tmp / div ).astype(int) )
+        ngram_mtx_upside_down.append(np.floor(tmp / div).astype(int))
         tmp = np.mod(tmp, div)
     ngram_mtx = np.flipud(ngram_mtx_upside_down)
-    # convert back from digits to alphabet
-    alph_mtx = np.vectorize(lambda k : inv_code[k])(ngram_mtx)
 
-    return [ ('').join(x) for x in alph_mtx.T ]
+    # Convert back from digits to alphabet
+    alph_mtx = np.vectorize(lambda k: inv_code[k])(ngram_mtx)
 
-#######################
-#  COUNTS GENERATORS  #
-#######################
+    return [('').join(x) for x in alph_mtx.T]
 
 def data_generator(
-    counts_hist_gen_, size, *chg_args,
-    seed=None, thres=1e3, njobs=None,
+    counts_hist_gen_, size, *chg_args, seed=None, thres=1e3, njobs=None,
      ):
-    '''Counts generator parallelizer for function counts_hist_gen_( seed, size, *chg_args,).'''
+    '''Counts generator parallelizer for function counts_hist_gen_( seed, size, *chg_args,).
 
+    Parameters
+    ----------
+        counts_hist_gen_ (function): The function to generate counts and histograms.
+        size (int): The size of the data to generate.
+        *chg_args: Additional arguments to be passed to counts_hist_gen_.
+        seed (int, optional): The seed for random number generation. Defaults to None.
+        thres (float, optional): The threshold for determining the number of CPU cores to use. Defaults to 1e3.
+        njobs (int, optional): The number of parallel jobs to run. Defaults to None.
+
+    Returns
+    -------
+        output: The generated counts and histograms.
+    '''
     if njobs is None :
         CPU_count = min( int(np.ceil(size/thres)), multiprocessing.cpu_count() ) 
-        # FIXME : does this make sense?
 
     if CPU_count > 1 :
         size_per_job = np.floor( size / CPU_count ).astype(int)
@@ -396,8 +446,6 @@ def data_generator(
             seed = rng.integers(1e9)
         child_seeds = np.random.SeedSequence(seed).spawn(len(n_pool))
         args = [ ( s, n, *chg_args ) for s,n in zip(child_seeds, n_pool) ]
-        #args = tqdm( args, total=len(args), desc='Generating counts', disable=(not verbose) )
-        # FIXME : tqdm update fills the bar instantly 
         POOL = multiprocessing.Pool( CPU_count )
         results = POOL.starmap( counts_hist_gen_, args )
         POOL.close()
@@ -405,7 +453,6 @@ def data_generator(
         output = results[0]
         for to_add in results[1:] :
             output = output.add(to_add, fill_value=0)
-        # NOTE : is it the addition casting to floats?
         output = output.astype(int)
     else :
         output = counts_hist_gen_( seed, size, *chg_args )
@@ -429,13 +476,8 @@ def data_hist_gen( seed, size, *chg_args ) :
     pmf = chg_args[0]
     return pmf_data_hist_gen( pmf, size=size, seed=seed )
 
-###################
-#  MARKOV NGRAMS  #
-###################
-
 def probLogprob( x, y ) :
     '''- x * log( x )'''
-    # FIXME: zeros in log
     return - x * np.log(y)
 
 def entr_operator( x ) :
@@ -488,7 +530,6 @@ class markov_class() :
     def statState( self, ) :
         '''Stationary state of to the transition matrix `MarkovMatrix`.'''
         
-        # FIXME : is it always correct?
         e_val, e_vec = np.linalg.eig( self.markov_matrix )
         # note: eigenvector are by column
         sstate = e_vec[ :, np.isclose(e_val, 1.) ]
