@@ -2,7 +2,7 @@
 
 The python software _catede_ is a collection of different estimation methods for the entropy and divergence in the context of categorical distribution with finite number of categories.
 Provided a data sample in the shape of a list or other comprehensive supported formats, the software provides methods to estimate the Shannon entropy, the Simpson index, the Kullback-Leibler divergence and the Hellinger distance.
-In particular it provides the code for the Dirichlet prior mixture estimators for the divergence, presented in Camaglia et al. (2023), [arXiv:2307.04201](https://arxiv.org/abs/2307.04201).
+In particular it provides the code for the Dirichlet prior mixture estimators for the divergence, published in Camaglia et al. (2024), [Phys. Rev. E](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.109.024305).
 
 ![](docs/source/kullback-leibler-dirichlet-scheme.png)
 
@@ -14,7 +14,9 @@ The package _catede_ can be installed from github by running from terminal the f
 
 ## References
 
-Francesco Camaglia, Ilya Nemenman, Thierry Mora, Aleksandra Walczak (2023). Bayesian estimation of the Kullback-Leibler divergence for categorical sytems using mixtures of Dirichlet priors. [ 	arXiv:2307.04201](https://arxiv.org/abs/2307.04201)
+Cite this as:
+
+Francesco Camaglia, Ilya Nemenman, Thierry Mora, Aleksandra Walczak (2024). Bayesian estimation of the Kullback-Leibler divergence for categorical sytems using mixtures of Dirichlet priors. [Phys. Rev. E](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.109.024305)
 
 ## Tutorial
 

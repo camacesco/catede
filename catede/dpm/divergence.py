@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-    Unbiased Dirichlet Mixture Method - Divergence Estimator
+    Dirichlet Prior Mixture Method - Divergence Estimator
     Copyright (C) January 2024 Francesco Camaglia, LPENS 
 '''
 
