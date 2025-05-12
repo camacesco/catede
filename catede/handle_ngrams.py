@@ -362,7 +362,7 @@ def load_file_dict( file_input, header=None, index_col=0, delimiter=",", compres
                      compression=compression, sep=delimiter )
     
     # CHECK num :
-        Lengths = list( map( len, df.index.astype(str) ) ) 
+    Lengths = list( map( len, df.index.astype(str) ) ) 
     if len(Lengths) == 0 :
         raise IOError( "The ngrams file is empty." )
     elif len( set(Lengths) ) > 1 :
